@@ -1,0 +1,41 @@
+schema: 1
+story: '15.1'
+story_title: 'Replace PyMuPDF (fitz) with pypdfium2'
+gate: PASS
+status_reason: 'Clean dependency swap with full test coverage. All 50 targeted tests pass, zero residual AGPL references in source, license is MIT-clean.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-04-09T18:00:00Z'
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: '2026-04-23T18:00:00Z'
+
+evidence:
+  tests_reviewed: 50
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_gaps: []
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: 'AGPL license encumbrance removed. pypdfium2 is Apache-2.0/BSD-3, fully compatible with MIT. No new attack surface introduced.'
+  performance:
+    status: PASS
+    notes: 'pypdfium2 uses PDFium (Chromium engine). Render API is equivalent; scale parameter maps directly from DPI. No degradation expected.'
+  reliability:
+    status: PASS
+    notes: 'All three import patterns (unconditional, try/except guard, lazy) correctly implemented. Error handling preserved at all call sites.'
+  maintainability:
+    status: PASS
+    notes: 'Test mocks updated to match new API surface. Documentation (CLAUDE.md, architecture.md) consistent. 50/50 tests pass.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Clean stale .pyc bytecode from non-3.13 interpreters in grounding/__pycache__/'
+      refs: ['grounding/__pycache__/*.cpython-312.pyc', 'grounding/__pycache__/*.cpython-314.pyc']

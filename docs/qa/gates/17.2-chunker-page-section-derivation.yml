@@ -1,0 +1,62 @@
+schema: 1
+story: "17.2"
+story_title: "Chunker Page/Section Derivation"
+gate: PASS
+status_reason: "All 11 ACs implemented and covered by 14 tests (12 unit + 2 integration). `split_markdown` preserved bit-for-bit; new provenance API is additive with frozen dataclasses and pure `derive_chunk_metadata`. Controller/pipeline wiring is minimal and backward-compatible via empty-tuple `element_map` default. Eval gate PASS (worst_drop 0.000, recall@1–10 = 1.000, MRR 1.000). No new runtime dependencies."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-14T00:00:00Z"
+
+top_issues: []
+
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-28T00:00:00Z"
+
+evidence:
+  tests_reviewed: 14
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_partial: []
+    ac_gaps: []
+  notes:
+    - "AC1: `ChunkWithProvenance(text, char_start, char_end)` frozen dataclass at chunker.py:98-104; produced by `split_markdown_with_map` ordered by `char_start` (asserted in-function)."
+    - "AC2: `split_markdown` signature and behavior unchanged (chunker.py:53-90). `test_split_markdown_backward_compatible` locks byte-identical equivalence between old API and `[r.text for r in split_markdown_with_map(...)]` on fixed input."
+    - "AC3: `derive_chunk_metadata(chunk, elements) -> ChunkProvenance(page_start, page_end, section_heading)` at chunker.py:194-236. Pure function; no I/O."
+    - "AC4 (determinism): implicit from function purity and passing tests. No explicit 'run-twice-and-diff' test; called out as a low-priority future improvement in the QA results."
+    - "AC5: `page_start` = min, `page_end` = max over overlapping elements with non-null `page_number`; all-null → both `None`. Covered by test_chunk_with_all_null_pages_gets_null_pages, test_chunk_spanning_pages_3_to_5_gets_range, test_chunk_with_mixed_null_and_page_excludes_null."
+    - "AC6: Section-heading loop iterates elements with `char_start <= chunk.char_start` and retains the last non-empty `heading_stack[-1]`. 'Earlier section wins' convention proven by test_chunk_straddling_heading_gets_earlier_section (3.2→3.3 → 3.2). Null path proven by test_chunk_before_any_heading_has_null_section. Convention documented in function docstring (chunker.py:197-208) and in CLAUDE.md."
+    - "AC7: Controller call sites at controller.py:372 (splitter) and controller.py:541 (derive) thread page_start/page_end/section_heading into `build_chunk_metadata` at controller.py:561-571. `ChunkMetadata.items()` emits `page_start`/`page_end` keys always, omits `section_heading` when None — both behaviors verified on disk."
+    - "AC8: `format_markdown_with_map` replaces `format_markdown` in pipeline.py:278-285 and stores `format_result.elements` onto `FileContext.element_map`. TextElement-only input → element map carries `page_number=None` throughout → chunks land with all-null fields. Covered by test_pipeline_text_element_fallback_all_null_pages and test_pdftotext_fallback_all_null. No log spam observed."
+    - "AC9: All six required scenarios present (single page, pages 3-5, straddling heading, before any heading, Markdown-only, pdftotext fallback) plus six additional (monotonic offsets, backward-compat, all-null pages, mixed null/page, empty map, unstructured-style integration). 12 unit tests in tests/test_chunker_provenance.py; full file runs in ~0.1s."
+    - "AC10: `test_pipeline_writes_populated_front_matter` exercises pipeline → format_markdown_with_map → split_markdown_with_map → derive_chunk_metadata → render_chunk → writer → on-disk YAML readback. Monkeypatched `parse_pdf` returns unstructured-shaped stubs to avoid coupling the test to `unstructured`'s per-PDF classification heuristics; the dev writeup explains the tradeoff. Integration covers both populated and all-null paths (the TextElement fallback is covered by test_pipeline_text_element_fallback_all_null_pages)."
+    - "AC11: `grounding eval --agent mini ... --baseline docs/eval/baselines/mini-corpus.json --fail-under 0.05` → PASS (worst_drop 0.000, recall@1 1.000, recall@3 1.000, recall@5 1.000, recall@10 1.000, MRR 1.000, nDCG@10 1.421). Reran live during review; report at docs/eval/reports/mini-20260414-213214.{md,json}."
+    - "Full-suite A/B: tests/test_chunker_provenance.py + tests/test_pipeline_citation_integration.py + adjacent modules (test_chunker, test_formatter, test_formatter_element_map, test_chunk_metadata, test_pipeline, test_controller) = 51 passed + 1 preexisting failure (test_run_pipeline_dry_run_skips_file_ops). Preexisting status confirmed via `git stash` A/B (fails on main without these changes)."
+    - "Determinism-adjacent safety: cursor advance in split_markdown_with_map clamps to `char_start+1` (chunker.py:182), preventing non-monotonic offsets even in the pathological case of `chunk_overlap >= len(chunk)` (already blocked by ChunkConfig.validate). Monotonic invariant explicitly asserted at chunker.py:184-189."
+    - "No new runtime dependencies. Only stdlib additions (`dataclasses`, `typing.Optional/Sequence/Tuple`) and internal import of `FormattedElement` from Story 17.1."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "Pure functions operating on in-memory strings and tuples. No shell-outs, no network, no external input ingestion. YAML rendering still flows through the hardened `_serialize_yaml_value` helper (unchanged). `text.find(chunk, cursor)` does not execute untrusted content."
+  performance:
+    status: PASS
+    notes: "`split_markdown_with_map` is O(k · L) where k = chunk count and L = avg search distance per chunk (bounded by cursor advance). `derive_chunk_metadata` is O(n) per chunk over the element map. For typical documents (hundreds of elements, tens of chunks) this is negligible. Eval harness `worst_drop=0.000` — no retrieval regression. 14 new tests run in ~5.3s, dominated by one-time model load in the integration tests."
+  reliability:
+    status: PASS
+    notes: "Monotonic-offset invariant asserted in-function; ValueError raised if the LangChain splitter emits a chunk that cannot be located in source (should not happen, but fails loudly if it does). Null paths explicit and documented. Empty-element-map path returns `ChunkProvenance(None, None, None)` without iteration (test_empty_element_map_returns_all_null). `FileContext.element_map` defaults to `()` so OMR / hybrid / pre-Story-17.1 callers keep working unchanged."
+  maintainability:
+    status: PASS
+    notes: "Frozen dataclasses, single-responsibility helpers, docstrings that encode the AC #6 boundary convention at the usage site. `CLAUDE.md` 'Chunk Front Matter (YAML)' block updated with the convention paragraph. No new runtime deps reduces dependency surface. Test failures left untouched on main (preexisting) are explicitly identified in the Dev Agent Record and confirmed by this review via `git stash` A/B."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add an explicit determinism test for AC #4: run `split_markdown_with_map` + `derive_chunk_metadata` twice on identical inputs and assert byte-identical outputs. Currently only implicit from function purity."
+      refs: ["tests/test_chunker_provenance.py"]
+    - action: "Consider dropping the unused `elements` parameter from `split_markdown_with_map`, or actually use it (e.g., to cross-validate that offsets align with element spans). The current 'API symmetry' rationale is documented but leaves a subtle footgun: a caller who passes `()` silently loses all citation data if they also forget to pass the correct map to `derive_chunk_metadata`."
+      refs: ["grounding/chunker.py:116-153"]
+    - action: "Revisit Marker sidecar wiring once Story 17.1's deferred work lands. Marker-produced documents currently fall through the TextElement / raw-Markdown path and inherit `page_number=None` for every element, so they get null pages despite Marker knowing per-block page info. Documented in 17.1 Dev Notes; not a blocker for 17.2."
+      refs: ["grounding/formatter.py", "docs/stories/17.1-parser-and-formatter-element-map.md"]

@@ -1,0 +1,58 @@
+schema: 1
+story: "16.1"
+story_title: "Fixture Schema and Loader"
+gate: PASS
+status_reason: "All 7 acceptance criteria met with 16 passing unit tests (required 6). Both QA nits from initial review resolved by dev: unused `field` import dropped and chunk-id regex tightened to `\\d{4}` to match the documented `ch_NNNN` convention."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-13T00:00:00Z"
+review_history:
+  - date: "2026-04-13"
+    gate: PASS
+    note: "Initial review — 2 nits flagged as future items."
+  - date: "2026-04-13"
+    gate: PASS
+    note: "Re-review after dev applied both nits (story v1.2). 16 tests still green; bundled example (`ch_0023`) still parses under tightened regex."
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-27T00:00:00Z"
+
+evidence:
+  tests_reviewed: 16
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+  notes:
+    - "pytest tests/test_eval_fixtures.py -v → 16 passed in 0.04s (re-run)"
+    - "test_bundled_example_fixture_loads exercises the committed docs/eval/fixtures/example.yaml against agents/examples/scientist.yaml — schema drift will break CI."
+    - "test_loader_does_not_touch_corpus_or_faiss confirms loader isolation from corpus/FAISS."
+    - "Regex tightened from `\\d{4,}` to `\\d{4}` (grounding/eval/fixtures.py:16); existing chunk-id-bad test still covers the reject path."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "yaml.safe_load only; no network, no writes, no deserialization of arbitrary objects. Filesystem reads confined to fixture path and agents/<name>.yaml existence check."
+  performance:
+    status: PASS
+    notes: "O(n) over items; fixtures are small by design. No caching needed."
+  reliability:
+    status: PASS
+    notes: "Every failure path raises FixtureValidationError with structured (path, item_id, field, reason) attributes. Empty vs malformed YAML produce distinct messages."
+  maintainability:
+    status: PASS
+    notes: "Typed frozen dataclasses, exhaustive validation, 16 unit tests including snapshot + live example round-trip. No new runtime deps."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "When Story 16.2 extends the schema, bump SCHEMA_VERSION and add a migration note in docs/eval/README.md."
+      refs: ["grounding/eval/fixtures.py:15"]
+      suggested_owner: po
+  resolved:
+    - action: "Unused `field` import from dataclasses removed (story v1.2)."
+      refs: ["grounding/eval/fixtures.py:9"]
+    - action: "Chunk-id regex tightened to `\\d{4}` to match documented `ch_NNNN` (story v1.2)."
+      refs: ["grounding/eval/fixtures.py:16"]

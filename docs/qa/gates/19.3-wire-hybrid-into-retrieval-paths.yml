@@ -1,0 +1,59 @@
+schema: 1
+story: '19.3'
+story_title: 'Wire Hybrid into Retrieval Paths'
+gate: PASS
+status_reason: 'All 15 ACs satisfied with strong test coverage and verified backward compatibility; mini-corpus eval gate produces bit-for-bit identical results (worst_drop 0.000) and 111 targeted tests pass.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2026-04-15T23:04:16Z'
+
+waiver: { active: false }
+
+top_issues:
+  - id: 'MNT-001'
+    severity: low
+    finding: 'Three near-duplicate resolver helpers across grounding/config.py, grounding/eval/cli.py, and scripts/local_rag.py (rerank + hybrid). Acknowledged in Dev Notes as carried-forward debt from 18.3.'
+    suggested_action: 'Unify into a single grounding/config.py helper that returns (rerank_config, hybrid_config) from a parsed namespace. Tracked informally; non-blocking.'
+    suggested_owner: dev
+  - id: 'MNT-002'
+    severity: low
+    finding: 'Hybrid result enrichment is implemented twice with slightly different shapes — once in scripts/search_corpus_tool.py:_enrich_from_chunk_ids and once inline in scripts/local_rag.py:search_corpus and mcp_servers/corpus_search/server.py:search_corpus. Three near-identical chunk_id→file_path lookup loops.'
+    suggested_action: 'Extract a shared enrichment helper (likely in grounding/) once a fourth call site appears or 19.4 needs to touch this code. Not blocking; the SearchCorpusTool helper Task 4 introduced is already a partial step.'
+    suggested_owner: dev
+  - id: 'TEST-001'
+    severity: low
+    finding: 'No end-to-end test that exercises the real grounding/hybrid.search_hybrid integration through SearchCorpusTool — all hybrid call sites stub the function. The composition test pins the contract but a full path through the production callable is not covered.'
+    suggested_action: 'Story 19.4 will exercise this end-to-end via the {hybrid×rerank} eval matrix; no separate test required if 19.4 lands soon. If 19.4 slips, add a single integration test that loads the mini BM25 + FAISS index and runs one query.'
+    suggested_owner: dev
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 111
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: 'No new attack surface — hybrid path reuses same on-disk artifacts as dense path; YAML loaded via safe_load; CLI args validated through HybridConfig.validate(). MCP server reads kwargs directly from tool arguments (consistent with rerank scope fence).'
+  performance:
+    status: CONCERNS
+    notes: 'Hybrid adds BM25 tokenization + ranking on top of dense; pool_k = max(hybrid.pool_size, rerank.pool_size, top_k) means hybrid+rerank fetches a wider pool than rerank alone. Story 19.3 itself does not measure the cost — by design, deferred to 19.4. The composition is correct; the open question is whether the latency budget holds. Off-by-default mitigates the risk for users who do not opt in.'
+  reliability:
+    status: PASS
+    notes: 'Dense-only fallback when BM25 artifacts are missing (hybrid_degraded flag). Backward-compat invariant verified via 5 dedicated tests + the eval gate (worst_drop 0.000 against the pre-19.3 baseline). Invalid CLI values exit 2 with actionable stderr.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Resolver duplication and triple enrichment-loop duplication (MNT-001, MNT-002) are real maintenance taxes. Both are explicitly acknowledged in Dev Notes and bounded — neither blocks the story. Unified resolver should land before Epic 20 introduces a third config dimension.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Unify rerank + hybrid resolver helpers into a single grounding/config.py function that returns both configs from a parsed namespace.'
+      refs: ['grounding/config.py', 'grounding/eval/cli.py:220-267', 'scripts/local_rag.py:744-794']
+    - action: 'Extract shared enrichment helper for hybrid hits → result dict; the chunk_id→file_path lookup is now duplicated three times.'
+      refs: ['scripts/search_corpus_tool.py:292-340', 'scripts/local_rag.py:267-290', 'mcp_servers/corpus_search/server.py:191-223']
+    - action: 'Story 19.4 should exercise the real search_hybrid path end-to-end so the integration is not stub-only forever.'
+      refs: ['tests/test_search_corpus_tool_hybrid.py', 'tests/test_eval_runner_hybrid.py']

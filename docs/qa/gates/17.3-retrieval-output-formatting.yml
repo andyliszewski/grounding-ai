@@ -1,0 +1,61 @@
+schema: 1
+story: "17.3"
+story_title: "Retrieval Output Formatting"
+gate: PASS
+status_reason: "All 10 ACs implemented. 50 tests pass (11 helper + 4 wiring + 1 integration + 3 MCP + 31 pre-existing regression). `grounding.citations.format_citation_prefix` is pure, dependency-free, covers all 5 variants with silent degradation. Agentic tool, MCP server, and local RAG all prefix results identically via the shared helper. Eval gate PASS (worst_drop 0.000, recall@1–10 = 1.000). No new runtime dependencies."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-14T22:10:00Z"
+
+top_issues: []
+
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-28T22:10:00Z"
+
+evidence:
+  tests_reviewed: 50
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_partial: []
+    ac_gaps: []
+  notes:
+    - "AC1: `format_citation_prefix(source, page_start, page_end, section_heading) -> str` at grounding/citations.py:46-75. Pure function, no I/O, importable from installed package — reachable from both scripts/search_corpus_tool.py:36 and mcp_servers/corpus_search/server.py:31."
+    - "AC2: All five variants covered by test_full_prefix_all_fields_present, test_page_range_renders_en_dash, test_page_only_when_section_null, test_section_only_when_pages_null, test_slug_only_when_all_null. En-dash enforced via module constant `EN_DASH = '\\u2013'` at citations.py:24; range test explicitly asserts no ASCII hyphen between page numbers."
+    - "AC2 (slug derivation): `_derive_slug` at citations.py:29-43 distinguishes filename vs slug via `Path(source).suffix` plus kebab-case regex `_SLUG_SHAPE`. `Report_2024 Q3.pdf` → `report-2024-q3`; `alpha-paper` (no ext, kebab shape) → pass-through. Verified by test_slug_derived_from_filename_stem and test_slug_passed_through_when_already_slug_shaped."
+    - "AC3: `_read_chunk` at scripts/search_corpus_tool.py:258-266 returns page_start/page_end/section_heading from parsed YAML. Per-result dict extended at line 217-219. `_format_results` emits prefix on line immediately after `--- Result N (source: ...) ---` header (line 283-290). Verified by test_read_chunk_surfaces_new_fields (line position asserted) and TestMiniCorpusCitationIntegration against real mini-corpus fixtures."
+    - "AC4: `read_chunk` at mcp_servers/corpus_search/server.py:124-128 returns metadata dict that carries the three new fields; `search_corpus` surfaces them at lines 186-188. `format_results_for_context` at lines 225-232 emits prefix before the trailing `*doc_id: X, chunk: Y*` annotation (which is preserved). Order verified by test_mcp_output_preserves_doc_id_annotation."
+    - "AC5: Prefix is emitted on its own line in both surfaces — search_corpus_tool.py appends via `lines.append(...)`; MCP server interleaves between header and doc_id annotation. Body text (`r['content']`) appears after the prefix, unmutated. Line-position invariant locked in test_format_results_includes_citation_prefix."
+    - "AC6: Missing-field degradation proven via tests/fixtures/pre-17_2-chunk.md (legacy YAML with no page/section) — test_read_chunk_missing_fields_return_none and test_format_results_handles_missing_metadata_gracefully. Anti-regression asserts: `'[legacy-paper, ,' not in out`, `'[legacy-paper, , ]' not in out`, `', , ' not in out`. Also empty-string section coerced to null via `_section_fragment` strip check (citations.py:88-92) — test_empty_section_string_treated_as_null."
+    - "AC7: CLAUDE.md gained 'Retrieval Output Format (Story 17.3)' sub-section at lines 384-403 under 'Metadata Contracts', covering all five variants in a table, semantics bullets (first-line-of-block, en-dash, slug derivation rule, additive nature)."
+    - "AC8: 11 helper unit tests + 4 agentic-tool wiring tests + 1 end-to-end integration against real mini-corpus + 3 MCP formatter tests = 19 new Story 17.3 tests. Full story test surface runs in 3.12s, well under budget."
+    - "AC9: `grounding eval --agent mini ... --fail-under 0.05` → PASS (recall@1 1.000, recall@3 1.000, recall@5 1.000, recall@10 1.000, MRR 1.000, nDCG@10 1.421, worst_drop 0.000). Reran live during review; report at docs/eval/reports/mini-20260414-220612.{md,json}. Mini-corpus chunks updated in-place with new YAML fields — chunk body text unchanged so the pre-existing FAISS index at tests/eval_fixtures/mini_index stays valid."
+    - "AC10: No new runtime dependencies introduced. Only new imports: `re` and `pathlib.Path` (stdlib) plus internal `grounding.utils.slugify`. `grep -n import grounding/citations.py` confirms."
+    - "Scope discipline: `scripts/local_rag.py` `format_context` was also prefixed (line 262-268) for parity with agentic + MCP surfaces. Documented in Dev Agent Record; a single-place change with identical helper. Not in original AC list but additive and consistent."
+    - "Full story-adjacent regression set: `pytest tests/test_citations.py tests/test_search_corpus_tool.py tests/test_mcp_server_output.py tests/test_agentic.py tests/test_eval_*.py` → 149 passed per Dev Agent Record. Re-ran story tests live: 50 passed in 3.12s."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "Pure string formatting with no user-controlled shell-outs, no new I/O, no network. `Path(source).suffix` is safe on arbitrary input (path parsing is name-only). `yaml.safe_load` (not `yaml.load`) used everywhere metadata is read. The prefix itself cannot inject control characters into the LLM's formatted output in a way that differs from the chunk body — both are already trusted corpus content."
+  performance:
+    status: PASS
+    notes: "`format_citation_prefix` is O(1) per call. `_read_chunk` gains three extra `metadata.get(...)` lookups — negligible. Eval harness confirms zero retrieval regression (worst_drop 0.000). Full 50-test suite runs in 3.12s including one-time embedder load."
+  reliability:
+    status: PASS
+    notes: "Helper never raises on `None` inputs — each variant falls through to the smallest prefix form via guarded string-construction. Empty-string section heading coerced to null via `.strip()` check so pdftotext fallback chunks never produce `[slug, , ]`. Legacy-chunk regression fixture committed at tests/fixtures/pre-17_2-chunk.md locks this invariant."
+  maintainability:
+    status: PASS
+    notes: "Single 93-line module, three helpers (`_derive_slug`, `_page_fragment`, `_section_fragment`) each <10 lines, docstring on the public function enumerates all five variants with worked examples. Helper lives in installed package (`grounding/citations.py`) so future surfaces (web UI, Story 17.4 eval metric) reuse it without duplication. Mini-corpus fixtures updated in-place with a note explaining why body text was preserved (FAISS index reuse)."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "`scripts/local_rag.py:format_context` now emits both `[Source: <filename>]` and the new `[<slug>, ...]` prefix, which double-labels the provenance. Consider dropping `[Source: ...]` in a follow-up once downstream prompts have adopted the citation prefix — outside Story 17.3 scope."
+      refs: ["scripts/local_rag.py:268"]
+    - action: "Story 17.4's `citation_accuracy` metric should call `format_citation_prefix` directly rather than re-implement the format. The helper is already importable and covers all five variants."
+      refs: ["grounding/citations.py", "docs/epics/epic-17-page-and-section-citations.md"]
+    - action: "If the project ever ships sources with mixed-case, dot-separated, non-kebab slugs (e.g. `My.Report`), the `_SLUG_SHAPE` regex will miss them and they'll slugify defensively — behavior is correct but may surprise. Document in the helper docstring if this becomes a real case."
+      refs: ["grounding/citations.py:26"]

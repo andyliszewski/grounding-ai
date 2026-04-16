@@ -1,0 +1,87 @@
+schema: 1
+story: "18.3"
+story_title: "CLI, MCP Schema, and Config Plumbing"
+gate: PASS
+status_reason: >-
+  All 11 acceptance criteria met with green tests across the touched and
+  adjacent suites and the mini-corpus eval gate at worst_drop 0.000
+  (bit-for-bit identical to baseline). Dev's v1.2 fix pass resolved the
+  three actionable advisory items from the initial review; remaining item
+  is a tracked follow-up.
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-15T18:42:00Z"
+expires: "2026-04-29T18:42:00Z"
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_gaps: []
+  test_runs:
+    - suite: "test_config_resolution.py, test_local_rag_cli_flags.py, test_eval_cli.py, test_local_rag_rerank.py, test_reranker.py"
+      result: "56 passed in 6.38s (re-run post v1.2)"
+    - suite: "test_search_corpus_tool.py, test_mcp_server_output.py, test_eval_runner.py, test_eval_runner_integration.py"
+      result: "62 passed in 2.90s (re-run post v1.2)"
+    - suite: "grounding eval --agent mini ... --baseline docs/eval/baselines/mini-corpus.json --fail-under 0.05"
+      result: "PASS (worst_drop 0.000, exit 0; re-run post v1.2)"
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: >-
+      yaml.safe_load used throughout; malformed/missing files degrade to {};
+      no new secrets surface; no network calls introduced.
+  performance:
+    status: PASS
+    notes: >-
+      Opt-in default preserved (verified by mini-corpus gate identical to
+      baseline). Rerank path bounded by RerankConfig.pool_size (default 50).
+  reliability:
+    status: PASS
+    notes: >-
+      Invalid CLI values rejected at parse time with EXIT_BAD_ARGS (=2);
+      malformed config.yaml logged at WARNING and falls through to defaults;
+      missing chunk front matter degrades gracefully for rerank input.
+  maintainability:
+    status: PASS
+    notes: >-
+      v1.2 fix pass: local_rag._build_parser() extracted so the argparse
+      test asserts against the real parser; EXIT_BAD_ARGS alias clarifies
+      the invalid-rerank exit branch; CLAUDE.md notes --rerank-top-k is
+      silently ignored when --rerank is off. Resolver duplication across
+      CLIs remains as an acknowledged, intentionally-scoped follow-up.
+
+top_issues: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Lift _resolve_rerank_config_from_args into grounding/config.py with
+        an on_error callback to remove the small duplication across the two
+        CLIs. Carried from v1.1 review per dev's v1.2 note.
+      refs: ["grounding/config.py", "grounding/eval/cli.py", "scripts/local_rag.py"]
+
+waiver:
+  active: false
+
+history:
+  - date: "2026-04-15T18:25:00Z"
+    version: "1.1"
+    gate: PASS
+    quality_score: 90
+    note: >-
+      Initial review. Four advisory items: (1) mirror-parser smoke test,
+      (2) resolver duplication, (3) misleading EXIT_FIXTURE_OR_AGENT_NOT_FOUND
+      reuse, (4) CLAUDE.md silent-ignore behavior. Maintainability CONCERNS.
+  - date: "2026-04-15T18:42:00Z"
+    version: "1.2"
+    gate: PASS
+    quality_score: 100
+    note: >-
+      Re-review after dev's v1.2 fix pass: items 1, 3, 4 fixed and verified;
+      item 2 carried as follow-up. Maintainability upgraded to PASS.

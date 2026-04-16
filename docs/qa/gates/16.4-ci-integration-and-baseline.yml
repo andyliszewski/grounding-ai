@@ -1,0 +1,78 @@
+schema: 1
+story: "16.4"
+story_title: "CI Integration and Baseline Publication"
+gate: PASS
+status_reason: "All 8 ACs verified end-to-end, including AC7 against the live GitHub environment (PR andyliszewski/grounding-ai-private#2, run 24379355603). All three concerns from the initial review are closed: REL-001 (tee race, fixed with `mkdir -p eval-output` + `code=${PIPESTATUS[0]}` captured before intervening commands), MNT-002 (baseline notes trimmed to README pointer), and TEST-001 (demo PR executed — uncovered and closed two silent false-green bugs that would have made the gate cosmetic on any real regression)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-14T04:00:00Z"
+
+top_issues: []
+
+waiver: { active: false }
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 73
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_partial: []
+    ac_gaps: []
+  notes:
+    - "Re-verified green path: `grounding eval --agent mini ... --baseline docs/eval/baselines/mini-corpus.json --fail-under 0.05` → direct exit 0 (captured via `$?` without pipe), worst_drop 0.000 PASS. Aggregate matches committed baseline."
+    - "Re-verified red path: forced baseline with ndcg_at_10:2.0 → direct exit 1, as expected from EXIT_BASELINE_REGRESSION."
+    - "pytest tests/test_eval_cli.py tests/test_eval_runner_integration.py tests/test_cli.py → 111 passed, 1 failed (test_parser_choice_validation — pre-existing failure flagged in both 16.3 and 16.4 Dev Agent Records, unrelated to eval work: the PDF CLI's `--parser` choice list excludes `marker`, which is a separate story's concern)."
+    - "AC7 closed: PR andyliszewski/grounding-ai-private#2, three runs, final run 24379355603 'correct red' — step failed, `eval-output/` artifact uploaded, PR comment posted with `<!-- grounding-eval-comment -->` marker and Markdown report showing `recall@1 0.000 (↓1.000)`, `MRR 0.306 (↓0.694)`, `worst_drop 1.000 → FAIL (recall_at_1)`. PR closed, branch deleted."
+    - "REL-001 fix verified at .github/workflows/eval.yml:66-79: `mkdir -p eval-output` precedes the pipeline, `code=${PIPESTATUS[0]}` captured immediately after the pipe before any other command, `echo exit_code=$code` and `exit \"$code\"` both use the saved value."
+    - "CLI subcommand registration verified at grounding/cli.py:670 — `subcommands = {\"embeddings\", \"agents\", \"eval\"}` and `_create_eval_parser(subparsers)` at 682. Shell invocation `grounding eval --help` now prints the full eval parser help (previously fell through to the PDF-converter argparse)."
+    - "MNT-002 fix verified at docs/eval/baselines/mini-corpus.json:6 — notes field trimmed to a pointer into docs/eval/README.md section 'Refreshing the baseline'."
+    - "Inherited carryovers (unchanged, not regressions): MNT-001 (duplicate _make_run_id call from 16.3) and the nDCG@10>1.0 normalization known-issue (flagged in Dev Agent Record completion notes; baseline is internally consistent)."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "Workflow permissions remain minimum-necessary (pull-requests: write + contents: read). All actions pinned to major versions. No secrets in workflow. `actions/github-script` uses inline JS only."
+  performance:
+    status: PASS
+    notes: "Three-layer caching (pip, sentence-transformers model, FAISS index by content hash) in place and keyed correctly. Live demo runs (24379119370, 24379238795, 24379355603) completed within timeout-minutes: 10. Cache effectiveness now observed in the live environment."
+  reliability:
+    status: PASS
+    notes: "Both silent-false-green failure modes surfaced by the demo PR are fixed: (1) `grounding eval` subcommand now registered in `main()` so shell invocations actually reach the eval parser; (2) workflow captures `PIPESTATUS[0]` into `code` before any intervening command, preserving grounding eval's true exit code. The tee race (REL-001) is closed with `mkdir -p eval-output`. Artifact upload remains `if: always()`; comment gates on exit_code==1."
+    # NB: the demo PR's discovery of these two bugs is a textbook case for why AC7 was
+    # load-bearing. Without the live run both would have shipped as cosmetic gates.
+  maintainability:
+    status: PASS
+    notes: "Paths filter documented as load-bearing in docs/eval/README.md. Baseline envelope format_version:1 in place. Baseline notes now a pointer (no procedure duplication). Change Log tracks both the fix cycle and the live-env verification with concrete run IDs."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add a minimal shell-invocation smoke test that exercises `grounding eval --help` via subprocess so a future regression of the subcommand registration is caught by pytest rather than CI."
+      refs: ["grounding/cli.py:667-689", "tests/test_eval_cli.py"]
+    - action: "Fix the nDCG@10 normalization (values >1.0 reflect missing ideal-DCG divisor when multiple relevant chunks map to the same expected doc). Internally consistent today but blocks cross-agent comparability."
+      refs: ["grounding/eval/metrics.py"]
+    - action: "Collapse duplicate `_make_run_id` call in `eval_command` (carried over from 16.3 MNT-001)."
+      refs: ["grounding/eval/cli.py:297,307"]
+    - action: "When the PDF `--parser` CLI list is next touched, either add `marker` as a valid choice or update `test_parser_choice_validation` — unrelated to eval but long-standing pre-existing failure."
+      refs: ["grounding/cli.py", "tests/test_cli.py"]
+
+downstream_impact:
+  - story: "Epic 16 close-out"
+    impact: "All 16.4 ACs met. Epic 16 is complete. Tier 1 #1 (page and section citations) is correctly flagged as unblocked by the harness in ROADMAP."
+  - story: "Tier 1 #1 (citations) and downstream retrieval work"
+    impact: "Now has a working public CI gate plus a verified baseline-refresh procedure. Any recall/MRR/nDCG regression on the mini corpus will fail the PR check and post the Markdown report."
+
+expires: "2026-04-28T00:00:00Z"
+
+review_history:
+  - date: "2026-04-14"
+    gate: CONCERNS
+    note: "Initial review. 7/8 ACs verified end-to-end locally. AC7 demo PR deferred per Dev Agent Record — low-probability live-env failure modes remain unverified. One minor workflow bug (tee race) and one baseline-notes duplication issue."
+  - date: "2026-04-14"
+    gate: PASS
+    note: "Re-review after dev fixes. REL-001 and MNT-002 closed. TEST-001 closed by executing the demo PR (andyliszewski/grounding-ai-private#2, run 24379355603 correct-red) — the run surfaced two additional silent-false-green bugs (unregistered `eval` subcommand in `grounding/cli.py:main()`; `PIPESTATUS[0]` read after an intervening `echo`) which were both fixed and folded back into this story. Without the live run both bugs would have shipped. Quality score 100."
+  - date: "2026-04-14"
+    gate: PASS
+    note: "Second re-review. Non-blocking follow-up applied: `test_eval_reachable_via_python_m_grounding_cli` added at tests/test_eval_cli.py:93-122 — a subprocess smoke asserting `python -m grounding.cli eval --help` reaches the eval parser (positive: --agent/--baseline/--fail-under; negative: no `input_dir output_dir`, no --chunk-size). Had this test existed at 16.3 review time, the subcommand-registration gap would have been caught there rather than in a live demo PR. Full eval suite: 74/74 passing in 4.32s. No gate change; story remains PASS, score 100."

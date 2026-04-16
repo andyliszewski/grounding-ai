@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "corpus-search": {
+      "command": "./venv/bin/python",
+      "args": ["-m", "mcp_servers.corpus_search.server"],
+      "cwd": ".",
+      "env": {
+        "CORPUS_DIR": "./corpus",
+        "EMBEDDINGS_DIR": "./embeddings",
+        "AGENTS_DIR": "./agents"
+      }
+    }
+  }
+}

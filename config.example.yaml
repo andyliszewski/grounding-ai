@@ -1,0 +1,95 @@
+# Grounding - Configuration
+#
+# Copy this file to config.yaml and customize paths for your setup.
+# All paths can be relative (to this repo) or absolute.
+
+paths:
+  # Where processed documents live
+  corpus: ./corpus
+
+  # FAISS embedding indexes (per-agent)
+  embeddings: ./embeddings
+
+  # Drop documents here for ingestion
+  staging: ./staging
+
+  # Agent YAML definitions
+  agents: ./agents
+
+  # Archived source documents after successful ingestion
+  originals: ./originals
+
+  # Documents that failed processing or were unsupported
+  skipped: ./skipped
+
+# ── Multi-machine setup (optional) ──────────────────────────────
+#
+# If you run a dedicated ingestion server (e.g., via Syncthing),
+# point these at your shared directories:
+#
+# paths:
+#   corpus: ~/Documents/Corpora/corpus
+#   embeddings: ~/Documents/Corpora/embeddings
+#   staging: ~/Documents/staging
+#   originals: ~/Documents/Corpora/originals
+#
+# See docs/multi-machine.md for full setup guide.
+
+# ── Embedding settings ──────────────────────────────────────────
+
+embeddings_config:
+  # Auto-generate embeddings after ingestion
+  auto_embeddings: false
+
+  # Stale lock timeout in seconds
+  lock_timeout: 3600
+
+# ── Watcher settings ───────────────────────────────────────────
+
+watcher:
+  # Minimum text chars per MB to consider a PDF text-extractable
+  # Below this threshold, PDFs are treated as scanned and skipped
+  min_text_yield_per_mb: 1000
+
+  # Pull latest git changes before processing (for multi-machine setups)
+  git_pull_enabled: false
+
+# ── Retrieval settings ─────────────────────────────────────────
+#
+# Cross-encoder reranking (Epic 18) is off by default. CLI flags
+# (--rerank, --rerank-model, --rerank-pool-size) override any values
+# set here. See CLAUDE.md "Reranking" for the latency/quality table
+# and full configuration resolution order.
+
+retrieval:
+  rerank:
+    # Enable cross-encoder reranking after FAISS retrieval.
+    # Off by default; see CLAUDE.md for the latency/quality trade-off.
+    enabled: false
+
+    # Cross-encoder model. bge-reranker-base is the default.
+    # Alternatives: cross-encoder/ms-marco-MiniLM-L-6-v2 (lighter),
+    #               BAAI/bge-reranker-large (heavier, higher quality).
+    model: BAAI/bge-reranker-base
+
+    # Number of FAISS candidates fed to the reranker.
+    # Higher = better quality, slower. Default 50.
+    pool_size: 50
+
+    # Cross-encoder inference batch size.
+    batch_size: 16
+
+  hybrid:
+    # Enable BM25 + dense fusion via Reciprocal Rank Fusion before
+    # (optional) rerank. Off by default; see CLAUDE.md "Hybrid Retrieval"
+    # for when to enable and the latency/quality trade-off.
+    enabled: false
+
+    # Candidates fetched from each channel (FAISS and BM25) before fusion.
+    # Higher = better recall, slightly slower. Default 50.
+    pool_size: 50
+
+    # Reciprocal Rank Fusion damping constant. Literature standard is 60;
+    # larger values flatten rank contributions, smaller values amplify the
+    # top ranks. Default 60.
+    k_rrf: 60

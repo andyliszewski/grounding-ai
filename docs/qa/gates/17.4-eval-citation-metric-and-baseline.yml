@@ -1,0 +1,35 @@
+schema: 1
+story: '17.4'
+gate: PASS
+status_reason: "All 16 acceptance criteria satisfied. Implementation and test coverage are solid; local eval gate passes (worst_drop 0.000, citation_accuracy 1.000); demo-regression PR #1 (branch demo/17.4-regression-citation, run 24433028644) independently proves CI fires on section_heading loss (citation_accuracy 0.000 ↓1.000, worst_drop 1.000 FAIL). PR closed, branch deleted, URLs recorded in Change Log."
+reviewer: 'Quinn'
+updated: '2026-04-15T03:15:00Z'
+top_issues: []
+waiver: { active: false }
+tests_run:
+  - command: "pytest tests/test_eval_fixtures.py tests/test_eval_citation_accuracy.py tests/test_eval_report.py tests/test_eval_baseline.py tests/test_eval_cli.py"
+    result: "75 passed"
+  - command: "pytest tests/test_eval_runner.py tests/test_eval_runner_integration.py"
+    result: "12 passed"
+  - command: "grounding eval --agent mini ... --baseline docs/eval/baselines/mini-corpus.json --fail-under 0.05"
+    result: "worst_drop 0.000 PASS, citation_accuracy 1.000, n_citation_items=2"
+  - command: "gh run view 24433028644 (demo regression)"
+    result: "failure (expected): citation_accuracy 0.000 ↓1.000, worst_drop 1.000 → FAIL"
+verified:
+  - "PR https://github.com/andyliszewski/grounding-ai/pull/1 state=CLOSED"
+  - "CI run https://github.com/andyliszewski/grounding-ai/actions/runs/24433028644 conclusion=failure on demo/17.4-regression-citation"
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "No new surface area. YAML read path uses yaml.safe_load."
+  performance:
+    status: PASS
+    notes: "Per-query ~10 small-file YAML reads for page/section front matter is negligible on eval-set sizes; documented as a profiling follow-up in _read_chunk_citation_metadata. End-to-end mini eval completes well under a second after embedder load."
+  reliability:
+    status: PASS
+    notes: "Missing file / missing front matter / malformed YAML / non-dict payload all degrade silently to (None, None, None) — citation metric treats as miss. v1→v2 baseline coercion unit-tested. Asymmetric metric presence logged at INFO and excluded from worst_drop."
+  maintainability:
+    status: PASS
+    notes: "Pure functions in metrics.py; CitationCase is frozen. Tests cover page int/range/section/both/neither/case-mismatch/empty/missing-metadata/fractional. Schema validation rejects bools, negatives, wrong-length ranges, out-of-order ranges, empty sections. format_version bump documented in module docstrings of report.py and baseline.py."
+quality_score: 100

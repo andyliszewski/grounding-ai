@@ -1,0 +1,143 @@
+schema: 1
+story: "19.2"
+story_title: "Hybrid Retrieval + RRF"
+gate: PASS
+status_reason: >-
+  All 12 ACs met. Re-review after Dev applied both prior-review findings
+  (MNT-001, TEST-001). The two helpers are now collapsed into
+  `_extract_tombstones_and_docids`, and `test_dense_only_fallback_filters_faiss_tombstones`
+  directly covers the previously untested FAISS-tombstone drop in the
+  dense-only path. Full suite: 11 tests pass in 4.01s, all
+  injection-based (zero real FAISS / BM25 / embedder access). AC #12
+  additive-only constraint still holds — only `grounding/hybrid.py` and
+  `tests/test_hybrid.py` are new; no edits to vector_store.py, bm25.py,
+  eval/runner.py, reranker.py, or any retrieval surface. No outstanding
+  issues.
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-15T21:30:00Z"
+expires: "2026-04-29T21:30:00Z"
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 11
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+  test_runs:
+    - suite: "pytest tests/test_hybrid.py -v"
+      result: "11 passed in 4.01s (post-QA-fix)"
+    - check: >-
+        MNT-001 resolution — verified single helper
+        `_extract_tombstones_and_docids` at hybrid.py:116 with both
+        call sites (lines 226, 239) updated. Prior
+        `_faiss_chunk_metadata` / `_bm25_chunk_metadata` duplicates
+        removed.
+      result: "Resolved."
+    - check: >-
+        TEST-001 resolution — verified new test
+        `test_dense_only_fallback_filters_faiss_tombstones` at
+        test_hybrid.py:247 exercises the dense-only FAISS-tombstone
+        branch directly. Asserts tombstoned chunk is dropped AND
+        `hybrid_degraded=True` on remaining results.
+      result: "Resolved."
+    - check: >-
+        AC #12 additive-only constraint re-verified via `git status`.
+        Only new files `grounding/hybrid.py` and `tests/test_hybrid.py`.
+      result: "Confirmed additive."
+    - check: >-
+        RRF worked example (AC #3) — expected final order B, A, E, C, D
+        with rrf_scores matching 1/(60+r_c) sums to ~1e-9.
+      result: "Match (test_rrf_math_worked_example)."
+    - check: >-
+        Purity check (AC #9) — real `vector_store.load_vector_index`,
+        `embedder.generate_embedding`, `bm25.load_bm25_index` all
+        patched to raise; test verifies zero real calls.
+      result: "Zero real calls (test_pure_no_real_faiss_or_bm25_access_with_injected_fns)."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: >-
+      No new external input surface. No network, no subprocess, no
+      new dependencies. Pure in-process RRF merge over ids + ranks.
+      Tombstone cross-check tightens an existing defense.
+  performance:
+    status: PASS
+    notes: >-
+      Up to 2×pool_size unique candidates enter an O(N log N) sort on
+      N≤100. Sub-millisecond overhead on top of dense search, which
+      remains the dominant cost and is unchanged. No latency-sensitive
+      surface wired yet — 19.3 owns the first live measurement.
+  reliability:
+    status: PASS
+    notes: >-
+      Four explicit degraded paths, each now directly tested: (1)
+      both channels empty → [], (2) BM25 artifacts missing →
+      dense-only with WARNING + `hybrid_degraded=True`, including
+      FAISS-tombstone filtering in that branch (new TEST-001
+      regression), (3) empty query tokens → BM25 contributes [], no
+      degradation marker (per AC #7), (4) cross-channel tombstone
+      inconsistency → drop from both channels' merge, DEBUG-log once
+      per call. Input validation at entry rejects `pool_size < 1`,
+      `top_k < 1`, `k_rrf < 1` with informative ValueErrors.
+  maintainability:
+    status: PASS
+    notes: >-
+      Module is tighter after MNT-001 fix (~345 lines, one fewer
+      helper). Docstring carries the fusion formula, worked example,
+      dense-only fallback semantics, and full return-dict shape —
+      19.3 can pick this up without re-reading the story. Tests are
+      atomic, inject all three expensive callables, and run in
+      ~4s for 11 cases.
+
+top_issues: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        When 19.3 wires hybrid into the retrieval surfaces, document in
+        CLAUDE.md that `hybrid_degraded` is a **key-presence** flag
+        (absent ≠ False). Downstream callers should use
+        `.get("hybrid_degraded", False)` or `"hybrid_degraded" in r`,
+        not `r["hybrid_degraded"]`.
+      refs:
+        - "grounding/hybrid.py"
+        - "docs/stories/19.3-*"
+      suggested_owner: dev
+    - action: >-
+        Once 19.4's measurement lands, capture the realized
+        dense-vs-hybrid latency delta. Dev Notes claim sub-ms RRF
+        merge overhead; confirm empirically on the chosen private
+        fixture so 19.3's default-flip decision (analogous to Epic
+        18.4) is grounded in measured numbers.
+      refs:
+        - "docs/epics/epic-19-hybrid-retrieval-bm25-dense.md"
+      suggested_owner: dev
+
+waiver:
+  active: false
+
+history:
+  - date: "2026-04-15T21:00:00Z"
+    version: "1.0"
+    gate: PASS
+    quality_score: 100
+    note: >-
+      Initial review. All 12 ACs met. 10 tests pass in 2.80s with
+      full-stub injection. RRF math, tie-break, dense-only fallback,
+      cross-channel tombstone defense, and empty-query semantics all
+      validated. Two low-severity follow-ups (MNT-001 duplicate
+      helper, TEST-001 missing fallback-tombstone regression test)
+      tracked but non-blocking.
+  - date: "2026-04-15T21:30:00Z"
+    version: "1.1"
+    gate: PASS
+    quality_score: 100
+    note: >-
+      Re-review after Dev applied both prior findings. MNT-001 and
+      TEST-001 resolved; 11 tests pass in 4.01s. No outstanding
+      issues. Ready for 19.3.

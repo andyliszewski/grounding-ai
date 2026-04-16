@@ -1,0 +1,39 @@
+{
+  "format_version": 2,
+  "agent": "mini",
+  "captured_utc": "2026-04-14T23:37:55+00:00",
+  "fixture_version": 1,
+  "notes": "Captured against the in-repo mini corpus at tests/eval_fixtures/mini_corpus/ with fixtures tests/eval_fixtures/mini_fixtures.yaml. Refreshed for Story 17.4 to record the citation_accuracy metric (n_citation_items=2). See docs/eval/README.md section 'Refreshing the baseline' for the regeneration procedure and the human-review requirement.",
+  "aggregate": {
+    "n_items": 3,
+    "n_skipped": 0,
+    "recall_at_1": 1.0,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "recall_at_10": 1.0,
+    "mrr": 1.0,
+    "ndcg_at_10": 1.4206198357143052,
+    "citation_accuracy": 1.0,
+    "n_citation_items": 2,
+    "per_tag": {
+      "philosophy": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0,
+        "n_items": 1,
+        "low_sample": true
+      },
+      "physics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0,
+        "n_items": 1,
+        "low_sample": true
+      },
+      "statistics": {
+        "recall_at_5": 1.0,
+        "mrr": 1.0,
+        "n_items": 1,
+        "low_sample": true
+      }
+    }
+  }
+}

@@ -1,0 +1,97 @@
+schema: 1
+story: "16.3"
+story_title: "CLI and Reporting"
+gate: PASS
+status_reason: "All 10 ACs implemented with matching tests; 27/27 new tests pass in ~0.14s. Exit-code policy, baseline diff semantics, and artifact schema align with the story spec. Two low-severity observations noted below, neither blocking."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-13T00:00:00Z"
+
+top_issues:
+  - id: "MNT-001"
+    severity: low
+    title: "run_id is computed twice per eval_command invocation"
+    location: "grounding/eval/cli.py:299,309"
+    note: |
+      `_make_run_id(args.agent)` is called once for the diff (cur_dict) and
+      again for artifact paths. The diff only consumes `aggregate`, so the
+      run_id embedded in cur_dict is never observed — but the duplicate call
+      is confusing and creates a theoretical cross-second mismatch window.
+      Suggested fix: compute `run_id` once at the top of the handler and
+      reuse it.
+    suggested_owner: dev
+
+  - id: "REQ-001"
+    severity: low
+    title: "Explicit --fail-under 0.0 without --baseline silently skips warning"
+    location: "grounding/eval/cli.py:271"
+    note: |
+      AC7: 'Without --baseline, --fail-under is ignored with a warning.'
+      Current guard is `if args.fail_under and args.baseline is None:` which
+      falsily skips the warning when the user explicitly passes
+      `--fail-under 0.0` (the default value). Acceptable since the net
+      behavior is the same (ignored), but the warning is spec'd
+      unconditionally. Consider `args.fail_under is not None` or tracking
+      whether the flag was explicitly provided via `default=argparse.SUPPRESS`.
+    suggested_owner: dev
+
+waiver: { active: false }
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 17
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+  notes:
+    - "pytest tests/test_eval_report.py tests/test_eval_baseline.py tests/test_eval_cli.py -q → 27 passed in 0.13s"
+    - "AC1/AC2 (argparse wiring): grounding/cli.py:670 adds 'eval' to subcommands set; cli.py:682 calls _create_eval_parser. test_cli_help_lists_eval_subcommand asserts --agent/--fixtures/--baseline/--fail-under in help output."
+    - "AC3 (run-id + two artifacts): test_cli_writes_md_and_json_artifacts globs scientist-*.md and scientist-*.json; _make_run_id builds <agent>-<UTC-yyyymmdd-hhmmss>."
+    - "AC4 (Markdown sections): test_to_markdown_contains_all_sections asserts header, aggregate, per-tag, per-item, and skipped sections all present; test_to_markdown_truncates_long_queries covers the 80-char cap with unicode ellipsis."
+    - "AC5 (JSON schema): report.py:9-53 docstring canonicalizes format_version:1; test_to_json_round_trip verifies shape; eval_run_to_dict serializes full EvalRun tree including per-item retrieved list."
+    - "AC6 (baseline delta): test_to_markdown_with_baseline_shows_delta_column verifies 'vs Baseline' column and up-arrow presence; stdout summary includes arrows when diff_result present (render_stdout_summary:190-192)."
+    - "AC7 (fail-under exit): test_cli_with_baseline_drop_exceeds_fail_under_exit_one → EXIT_BASELINE_REGRESSION (1); test_cli_with_baseline_within_tolerance_exit_zero → EXIT_OK; test_cli_warns_when_fail_under_without_baseline asserts stderr warning."
+    - "AC8 (stdout summary): render_stdout_summary lays out metrics 3-per-line with arrows; worst_drop/fail_under/verdict footer only emitted when baseline+fail_under both set; no ANSI emitted (NO_COLOR-safe)."
+    - "AC9 (report + baseline + cli unit tests): 27 tests across three files cover JSON round-trip, Markdown shape, query truncation, baseline load (valid/missing/format-version/malformed/missing-aggregate), diff arithmetic, per-tag drop, worst_drop clamp, fail-under pass/fail/zero-strict, atomic-write cleanliness."
+    - "AC10 (smoke): test_cli_runs_against_mini_corpus_exit_zero invokes eval_command against mini corpus from 16.2; _stub_default_embed autouse fixture avoids sentence-transformers download; total wall time ~0.14s (<< 15s budget)."
+    - "Exit codes verified: OK=0, BASELINE_REGRESSION=1, FIXTURE_OR_AGENT_NOT_FOUND=2 (fixture missing, unknown agent, agent mismatch), EMBEDDINGS_MISSING=3, UNEXPECTED=4 — matches Dev Notes exit table."
+    - "Atomic writes: both artifacts use grounding.utils.atomic_write via write_artifacts; test_write_artifacts_atomic_does_not_leave_tempfiles_on_success confirms no .tmp leftovers."
+    - "Worst-drop scope: baseline.py:27-37 restricts aggregate metrics to recall_at_{1,3,5,10}/mrr/ndcg_at_10 and per-tag to recall_at_5/mrr — excludes counts and low_sample per story spec."
+    - "Agent-mismatch branch (beyond AC10, flagged in Dev Agent Record): test_cli_agent_mismatch_with_fixture_exits_two exercises cli.py:254-260."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "Read-only operations except writes into --out (mkdir with parents, atomic rename). Baseline loader uses json.loads (safe). Fixture loader reuses 16.1's yaml.safe_load. No network, no shell execution."
+  performance:
+    status: PASS
+    notes: "Three test files run in 0.13s. Runner is O(n·top_k) from 16.2; CLI adds negligible overhead (serialization + two writes). Well under 15s budget for this story's tests."
+  reliability:
+    status: PASS
+    notes: "Exit codes are distinct per scenario per Dev Notes table, enabling CI branch logic. All path-validation errors print a 'pass --<flag>' hint. FileNotFoundError during embeddings load is caught → EXIT_EMBEDDINGS_MISSING. Bare-except for unexpected failures logs via logger.exception and returns EXIT_UNEXPECTED."
+  maintainability:
+    status: PASS
+    notes: "Module split (cli.py / report.py / baseline.py) keeps the top-level CLI lean. Canonical JSON schema documented in report.py module docstring with format_version:1. Re-exports in grounding/eval/__init__.py make the public surface discoverable. Two minor observations above (MNT-001, REQ-001) do not block."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Collapse duplicate _make_run_id call in eval_command into a single up-front assignment."
+      refs: ["grounding/eval/cli.py:299,309"]
+    - action: "Tighten --fail-under without --baseline warning to fire unconditionally (e.g., detect explicit flag via argparse.SUPPRESS default)."
+      refs: ["grounding/eval/cli.py:271"]
+    - action: "Story 16.4 should exercise exit code 3 (EXIT_EMBEDDINGS_MISSING) in CI smoke or doc it explicitly — currently untested."
+      refs: ["grounding/eval/cli.py:236-242"]
+
+downstream_impact:
+  - story: "16.4"
+    impact: "CI workflow depends on stable exit codes (0/1/2/3/4) and JSON format_version:1 contract from this story. Both are now in place and documented. Story 16.4 is unblocked."
+
+expires: "2026-04-27T00:00:00Z"
+
+review_history:
+  - date: "2026-04-13"
+    gate: PASS
+    note: "Initial review. All 10 ACs covered by tests (27 green). Two low-severity observations (run_id duplication, fail-under warning edge) — neither blocking. Quality score 100."

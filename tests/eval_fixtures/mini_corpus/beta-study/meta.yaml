@@ -1,0 +1,15 @@
+doc_id: doc-beta
+slug: beta-study
+orig_name: beta.pdf
+collections:
+  - test
+strategy: test
+params:
+  chunk_size: 400
+  chunk_overlap: 0
+  parser: test
+  ocr_mode: "off"
+hashes:
+  file_sha1: 0000000000000000000000000000000000000002
+  blake3: 0000000000000000000000000000000000000000000000000000000000000002
+  sha256: 0000000000000000000000000000000000000000000000000000000000000002

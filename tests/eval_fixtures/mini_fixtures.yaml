@@ -1,0 +1,29 @@
+# Integration-test fixture used by test_eval_runner_integration.py.
+# Queries are lexically aligned with the mini corpus chunks so a stub
+# embedder can recover the correct document. Not a substitute for real
+# retrieval evaluation.
+
+agent: mini
+version: 1
+items:
+  - id: mini-001
+    query: "alpha quantum mechanics transformer"
+    expected:
+      doc_ids: ["doc-alpha"]
+    tags: ["physics"]
+
+  - id: mini-002
+    query: "beta confidence interval bootstrap statistics"
+    expected:
+      doc_ids: ["doc-beta"]
+      page: [247, 249]
+      section: "3.2 Bootstrap Methods"
+    tags: ["statistics"]
+
+  - id: mini-003
+    query: "gamma philosophical falsifiability popper"
+    expected:
+      doc_ids: ["doc-gamma"]
+      page: 12
+      section: "Falsifiability and Demarcation"
+    tags: ["philosophy"]

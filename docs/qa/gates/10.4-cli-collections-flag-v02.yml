@@ -1,0 +1,52 @@
+schema: 1
+story: '10.4'
+story_title: 'CLI Collections Flag'
+gate: PASS
+status_reason: 'All acceptance criteria met with comprehensive test coverage. 71 tests passing including 8 dedicated CLI tests for --collections flag.'
+reviewer: 'Quinn (Test Architect)'
+updated: '2025-12-30T19:30:00Z'
+
+waiver: { active: false }
+
+top_issues: []  # All issues resolved
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 71
+  tests_passed: 71
+  tests_failed: 0
+  cli_tests: 18  # 10 validation + 8 collections
+  unit_tests: 53  # utils, meta, manifest
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: 'validate_collection_name() properly rejects invalid input patterns'
+  performance:
+    status: PASS
+    notes: 'Simple string parsing, no performance impact'
+  reliability:
+    status: PASS
+    notes: 'Graceful error handling with clear error messages'
+  maintainability:
+    status: PASS
+    notes: 'test_cli.py rewritten to use subprocess, all tests passing'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Consider migrating CLI to Typer for richer features if needed in future'
+      refs: ['pdf2llm/cli.py']
+
+history:
+  - at: '2025-12-30T19:15:00Z'
+    gate: CONCERNS
+    note: 'Initial review - test_cli.py broken, missing CLI tests for --collections'
+  - at: '2025-12-30T19:30:00Z'
+    gate: PASS
+    note: 'Re-review after fixes - test_cli.py rewritten, 8 collections tests added'

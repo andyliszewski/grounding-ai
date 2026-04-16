@@ -1,0 +1,10 @@
+# Test-only agent YAML.
+#
+# Not user-facing. Used by the retrieval eval harness (Epic 16) to run against
+# the in-repo mini corpus in tests/eval_fixtures/mini_corpus/. Kept under
+# tests/ so it never ships as a real agent definition.
+name: mini
+description: Test-only stub agent used by the mini-corpus integration test and CI eval gate.
+corpus_filter:
+  collections:
+    - test

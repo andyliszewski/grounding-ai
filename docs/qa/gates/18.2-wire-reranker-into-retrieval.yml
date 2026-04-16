@@ -1,0 +1,74 @@
+schema: 1
+story: "18.2"
+story_title: "Wire Reranker into Retrieval Paths"
+gate: PASS
+status_reason: "All 11 ACs met across three retrieval surfaces; 15 new tests green, mini-corpus eval gate PASS with worst_drop 0.000 (rerank off by default); zero new dependencies; clean plumbing-only PR safe to merge ahead of 18.3/18.4."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-15T00:00:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-29T00:00:00Z"
+
+evidence:
+  tests_reviewed: 15
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_gaps: []
+  ac_mapping:
+    "AC1 (SearchCorpusTool accepts rerank_config; disabled=identical)":
+      - "tests/test_search_corpus_tool.py::TestRerank::test_rerank_disabled_is_bit_for_bit_identical"
+    "AC2 (two-stage flow: fetch pool → rerank → top_k)":
+      - "tests/test_search_corpus_tool.py::TestRerank::test_rerank_enabled_reorders_results"
+      - "tests/test_search_corpus_tool.py::TestRerank::test_rerank_pool_size_larger_than_top_k"
+    "AC3 (rank re-assigned 1-indexed; faiss_distance preserved)":
+      - "tests/test_search_corpus_tool.py::TestRerank::test_rank_reassigned_post_rerank"
+      - "tests/test_reranker.py (18.1 contract: faiss_distance preserved through rerank)"
+    "AC4 (MCP server threading + schema)":
+      - "tests/test_mcp_server_output.py::test_search_corpus_with_rerank_config_applies_reranker"
+      - "tests/test_mcp_server_output.py::test_search_corpus_without_rerank_does_not_call_reranker"
+      - "tests/test_mcp_server_output.py::test_call_tool_builds_rerank_config_from_arguments"
+      - "tests/test_mcp_server_output.py::test_call_tool_no_rerank_when_flag_absent"
+      - "tests/test_mcp_server_output.py::test_tool_schema_declares_rerank_fields"
+    "AC5 (local_rag retrieval helper accepts rerank_config)":
+      - "tests/test_local_rag_rerank.py::test_retrieval_helper_honors_rerank_config_when_enabled"
+      - "tests/test_local_rag_rerank.py::test_retrieval_helper_skips_rerank_when_disabled"
+    "AC6 (citation prefix reflects reranked top)":
+      - "tests/test_search_corpus_tool.py::TestRerank::test_citation_prefix_reflects_reranked_top"
+    "AC7 (small-pool graceful: fewer than pool_size available)":
+      - "tests/test_search_corpus_tool.py::TestRerank::test_rerank_smaller_pool_than_configured_no_error"
+    "AC8 (top_k clamped 1..20; pool_size not clamped)":
+      - "Existing TestClamp suite + _clamp_top_k unchanged; pool_size has no clamp in code (verified by inspection)."
+    "AC9 (tests extend three suites)":
+      - "6 TestRerank cases in test_search_corpus_tool.py, 5 in test_mcp_server_output.py, 2 new in test_local_rag_rerank.py, 3 reassign_ranks cases in test_reranker.py"
+    "AC10 (eval gate green)":
+      - "grounding eval --agent mini → PASS, worst_drop 0.000 (identical to baseline)"
+    "AC11 (no new runtime dependencies)":
+      - "Verified by inspection: only imports from grounding.reranker (introduced in 18.1) and existing modules"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No new attack surface. MCP arguments cast to int/str defensively; malformed pool_size reaches RerankConfig.validate() which raises and is caught by existing exception path."
+  performance:
+    status: PASS
+    notes: "Opt-in by default (rerank_config=None or enabled=False). When disabled, fetch_k = top_k — bit-for-bit identical to pre-epic path; eval gate confirms worst_drop 0.000. Singleton reranker reused across calls."
+  reliability:
+    status: PASS
+    notes: "Small-pool handled gracefully. reassign_ranks is pure and immutable-friendly. Citation prefix integration preserved. MCP exception handler catches RerankConfig validation errors."
+  maintainability:
+    status: PASS
+    notes: "Consistent two-stage branching pattern across all three surfaces; reassign_ranks extracted as shared helper in grounding/reranker.py per 18.1 style; test suites extended in-place with dedicated test classes/blocks."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider adding a targeted assertion on pool_size not being clamped (AC8) — currently verified by inspection + indirect coverage via pool_size=50 case. Low value; safe to defer."
+      refs: ["scripts/search_corpus_tool.py:129-131", "mcp_servers/corpus_search/server.py:162-163", "scripts/local_rag.py:234-235"]
+    - action: "Consider asserting faiss_distance survives onto the retrieval-surface output for reranked results (not just the reranker contract from 18.1). Would harden AC3 against future refactors in search_corpus_tool / MCP / local_rag."
+      refs: ["tests/test_search_corpus_tool.py::TestRerank", "tests/test_mcp_server_output.py"]
+    - action: "Minor UX: MCP server call_tool could validate rerank_pool_size >= 1 before constructing RerankConfig and return a clearer error than the generic exception path. Low priority."
+      refs: ["mcp_servers/corpus_search/server.py:347-353"]

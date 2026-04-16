@@ -1,0 +1,96 @@
+schema: 1
+story: "8.5"
+story_title: "CLI Integration, Testing & Documentation"
+gate: CONCERNS
+status_reason: "Implementation complete and functional, but performance caching issue and missing integration tests warrant attention before production deployment."
+reviewer: "Quinn (Test Architect)"
+updated: "2025-10-18T22:00:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "PERF-001"
+    severity: high
+    finding: "pix2tex model re-initialized per PDF in batch processing mode"
+    suggested_action: "Implement lazy singleton pattern for model caching in formula_extractor.py (~30 min effort)"
+    suggested_owner: "dev"
+  - id: "TEST-001"
+    severity: medium
+    finding: "No integration tests with actual PDF samples"
+    suggested_action: "Add 3-5 test PDFs and integration test suite in next sprint"
+    suggested_owner: "dev"
+
+risk_summary:
+  totals:
+    critical: 0
+    high: 1
+    medium: 2
+    low: 2
+  highest:
+    id: PERF-001
+    score: 6
+    title: "Model re-initialization in batch mode"
+  recommendations:
+    must_fix:
+      - "Implement model caching before production batch workloads"
+    monitor:
+      - "Formula extraction success rate in production"
+      - "Batch processing performance metrics"
+
+quality_score: 80
+# Calculation: 100 - (10 for high issue PERF-001) - (10 for CONCERNS in performance NFR)
+# Adjusted +0 (no bonuses this review)
+
+evidence:
+  tests_reviewed: 13  # Unit tests passing (manifest, pipeline)
+  risks_identified: 5
+  trace:
+    ac_covered: [1, 2, 3, 4, 6, 7]  # ACs 1-4, 6-7 fully covered
+    ac_gaps: [5]  # AC5 partially covered (integration tests missing)
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No authentication/authorization concerns; input validation handled by trusted pix2tex library; atomic file writes; no SQL injection risk"
+  performance:
+    status: CONCERNS
+    notes: "Model re-initialization overhead (~1-2s per PDF); should cache model instance globally; affects batch processing efficiency"
+  reliability:
+    status: PASS
+    notes: "Proper error handling with graceful degradation; batch processing continues on failures; comprehensive logging"
+  maintainability:
+    status: PASS
+    notes: "Clean code structure; well-documented (README, architecture, installation guide); clear separation of concerns"
+
+recommendations:
+  immediate:  # Must fix before production
+    - action: "Add model caching to formula_extractor.py using lazy singleton pattern"
+      refs: ["pdf2llm/formula_extractor.py"]
+      effort: "~30 minutes"
+      impact: "Reduces batch processing overhead by 50-70%"
+
+  future:  # Can be addressed later
+    - action: "Add integration tests with actual PDF samples (3-5 test PDFs covering simple/complex/mixed formulas)"
+      refs: ["tests/test_formula_integration.py", "test_pdfs/"]
+      effort: "~2-4 hours"
+      impact: "Regression protection and accuracy validation"
+    - action: "Add performance timing logs for formula extraction phase"
+      refs: ["pdf2llm/controller.py"]
+      effort: "~1 hour"
+      impact: "Performance monitoring and regression detection"
+    - action: "Consider RapidLaTeXOCR (ONNX-based) for faster inference in future story"
+      refs: ["docs/epics/epic-8-formula-tool-comparison.md"]
+      effort: "Story 8.2 evaluation"
+      impact: "Potential 2-3x inference speedup"
+
+# Assessment file references
+assessment_files:
+  nfr: "docs/qa/assessments/8.5-nfr-20251018.md"
+  risk: "docs/qa/assessments/8.5-risk-20251018.md"
+  trace: "docs/qa/assessments/8.5-trace-20251018.md"
+
+# Gate history (append-only audit trail)
+history:
+  - at: "2025-10-18T22:00:00Z"
+    gate: CONCERNS
+    note: "Initial review - implementation complete but performance caching and integration tests needed"

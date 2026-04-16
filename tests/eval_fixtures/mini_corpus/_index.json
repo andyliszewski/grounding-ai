@@ -1,0 +1,33 @@
+{
+  "created_utc": "2026-04-13T00:00:00+00:00",
+  "updated_utc": "2026-04-13T00:00:00+00:00",
+  "docs": [
+    {
+      "doc_id": "doc-alpha",
+      "slug": "alpha-paper",
+      "orig_name": "alpha.pdf",
+      "chunk_count": 2,
+      "strategy": "test",
+      "doc_path": "alpha-paper/doc.md",
+      "meta_path": "alpha-paper/meta.yaml"
+    },
+    {
+      "doc_id": "doc-beta",
+      "slug": "beta-study",
+      "orig_name": "beta.pdf",
+      "chunk_count": 2,
+      "strategy": "test",
+      "doc_path": "beta-study/doc.md",
+      "meta_path": "beta-study/meta.yaml"
+    },
+    {
+      "doc_id": "doc-gamma",
+      "slug": "gamma-notes",
+      "orig_name": "gamma.pdf",
+      "chunk_count": 1,
+      "strategy": "test",
+      "doc_path": "gamma-notes/doc.md",
+      "meta_path": "gamma-notes/meta.yaml"
+    }
+  ]
+}
