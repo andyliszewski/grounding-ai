@@ -1,0 +1,44 @@
+schema: 1
+story: "18.1"
+story_title: "Reranker Module"
+gate: PASS
+status_reason: "All 12 ACs met with 17 passing unit tests; clean implementation mirroring the embedder.py singleton/retry pattern, no new runtime deps, sub-second test runtime."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-14T00:00:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-28T00:00:00Z"
+
+evidence:
+  tests_reviewed: 17
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pure in-process module; no user input surface, no I/O, no secrets."
+  performance:
+    status: PASS
+    notes: "Lazy model load, per-model singleton cache, configurable batch_size; CPU-only by design matches Epic 18 latency budget."
+  reliability:
+    status: PASS
+    notes: "3-attempt retry on load with clear RuntimeError; fail-fast KeyError on malformed chunks before any model call; input dicts not mutated; deterministic ordering verified."
+  maintainability:
+    status: PASS
+    notes: "Frozen dataclass config with validate(), clear docstrings, mirrors embedder.py conventions, 17 stub-based tests cover config, behavior, and singleton semantics."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Optional: add a direct test for the 3-attempt retry/RuntimeError path by monkeypatching CrossEncoder to raise. AC7 is currently verified by structural parity with embedder.py, not a dedicated test."
+      refs: ["grounding/reranker.py:57-100", "tests/test_reranker.py"]
+    - action: "Optional: add a test asserting CrossEncoder is constructed with device='cpu' (AC8). Current coverage is by code inspection only."
+      refs: ["grounding/reranker.py:79"]
+    - action: "Minor: docstring on module-level rerank() describes 'latest-config semantics' but the code replaces the singleton when config differs. Tighten wording for future-reader clarity; no behavior change needed."
+      refs: ["grounding/reranker.py:170-184"]

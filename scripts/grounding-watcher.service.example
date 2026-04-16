@@ -1,0 +1,34 @@
+[Unit]
+Description=Grounding staging watcher (auto-ingest + embeddings)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Paths — edit for your setup
+Environment=STAGING_DIR=%h/grounding/staging
+Environment=CORPUS_DIR=%h/grounding/corpus
+Environment=ORIGINALS_DIR=%h/grounding/originals
+Environment=SKIPPED_DIR=%h/grounding/skipped
+Environment=AGENTS_DIR=%h/grounding/agents
+Environment=EMBEDDINGS_DIR=%h/grounding/embeddings
+Environment=LOG_FILE=%h/grounding/watcher.log
+
+# Automatically update per-agent embedding indexes after each ingestion
+Environment=AUTO_EMBEDDINGS=true
+
+# If you keep your agents in a separate git repo and want the watcher to
+# pull before processing, point REPO_DIR at it.
+# Environment=REPO_DIR=%h/my-agents
+# Environment=GIT_PULL_ENABLED=true
+
+# Put the grounding venv's bin on PATH so `grounding` is found
+Environment=PATH=%h/grounding/venv/bin:/usr/local/bin:/usr/bin:/bin
+
+ExecStart=%h/grounding/grounding-ai/scripts/staging-watcher.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

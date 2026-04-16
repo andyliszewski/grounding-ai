@@ -1,0 +1,53 @@
+schema: 1
+story: "19.4"
+story_title: "Measure, Decide, Close"
+gate: PASS
+status_reason: "Null-result close executed cleanly per AC#4; four-cell matrix, flip decision, docs, ROADMAP, TD-004, and epic close are all in place with verified numbers. No source changes; baseline and config untouched per NO-FLIP path."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-16T00:08:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 162
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+  verifications:
+    - "Hybrid-adjacent suite: 98 passed (test_hybrid, test_bm25*, test_search_corpus_tool_hybrid, test_eval_runner_hybrid, test_config_resolution, test_local_rag_cli_flags, test_eval_cli, test_mcp_server_output)"
+    - "Rerank-adjacent suite: 64 passed (test_reranker, test_local_rag_rerank, test_search_corpus_tool)"
+    - "Mini baseline gate re-run: PASS, worst_drop 0.000 against untouched docs/eval/baselines/mini-corpus.json"
+    - "config.example.yaml: retrieval.hybrid.enabled=false (matches NO-FLIP)"
+    - "docs/eval/baselines/mini-corpus.json: 0 lines diff (matches NO-FLIP)"
+    - "docs/eval/README.md: four-cell matrix + latency table + flip paragraph + HybridProvenance block present"
+    - "CLAUDE.md: Hybrid Retrieval section has measured four-cell latency table + compound-cost callout"
+    - "docs/ROADMAP.md: hybrid retrieval in Shipped; larger embedding model promoted to Tier 1 #1 with 'Unblocked by Epic 19'"
+    - "docs/epics/epic-19: Status=Shipped, Completed Stories 4/4, Measured Outcome block, all per-story Draft→Done"
+    - "docs/TECH-DEBT.md: TD-004 added, modeled on TD-003; Last Updated line refreshed"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Docs-and-measurement story; no auth/input-handling surface touched."
+  performance:
+    status: PASS
+    notes: "Four-cell latency measured on realistic 16k-chunk index (private-agent), transcribed into README and CLAUDE.md with host footnote. Compound-cost callout for {HH} is honest about the Apple-Silicon cost."
+  reliability:
+    status: PASS
+    notes: "HybridProvenance verified correct in all four cells (AC#10); the macOS case-insensitive /tmp path collision was caught and corrected in Dev Record — no 19.3 bug surfaced."
+  maintainability:
+    status: PASS
+    notes: "Prose mirrors 18.4's precedent (same flip rule, same null-result shape, same TD entry template); future reviewer can diff TD-003↔TD-004 and README §18.4↔§19.4 side-by-side."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "When the ≥10-item private fixture set lands (TD-003 or TD-004, whichever first), re-run the four-cell matrix and revisit both flip decisions together — the interpretation paragraph is currently a bet, not a measurement."
+      refs: ["docs/TECH-DEBT.md:131", "docs/eval/README.md:199"]
+    - action: "Minor: README says `{hH} ~1310 ms`, CLAUDE.md says `~1300 ms`. Both are approximations with ~ prefix and internally consistent, but a future refresh could collapse to one value."
+      refs: ["docs/eval/README.md:250", "CLAUDE.md:769"]

@@ -1,0 +1,154 @@
+schema: 1
+story: "19.1"
+story_title: "BM25 Index Builder"
+gate: PASS
+status_reason: >-
+  All 12 ACs met with clean test coverage (20 tests, 0.05s). BM25
+  sidecar is purely additive — FAISS index format and existing tests
+  untouched, verified. Parallel-array contract with FAISS is visibly
+  preserved (mini-corpus fixture ordering matches FAISS _chunk_map
+  position-for-position), which sets up 19.2's RRF merge to be a
+  direct chunk_id dict lookup. Two non-obvious implementation
+  decisions — empty-corpus `None` sentinel pickle and the
+  `_grounding_tokenized_corpus` namespaced attribute on BM25Okapi —
+  are correct and cleanly documented. No runtime paths (CLI/MCP/local_rag)
+  are altered yet; the sidecar is write-only until 19.3 wires it in.
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-15T20:30:00Z"
+expires: "2026-04-29T20:30:00Z"
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 20
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+  test_runs:
+    - suite: "pytest tests/test_bm25.py tests/test_bm25_integration.py"
+      result: "20 passed in 0.05s"
+    - check: >-
+        Mini-corpus parallel-array contract: _bm25_map.json chunks[]
+        ordering vs. _chunk_map.json chunks[] ordering in
+        tests/eval_fixtures/mini_index/.
+      result: >-
+        Match — both emit doc-alpha_ch_0001, doc-alpha_ch_0002,
+        doc-beta_ch_0001, doc-beta_ch_0002, doc-gamma_ch_0001 at
+        indices 0..4. bm25_index i ↔ embedding_index i ↔ chunk_id.
+    - check: >-
+        FAISS format unchanged (AC #12). Visual diff of
+        _chunk_map.json schema against pre-19.1 shape; no fields
+        added/removed/reordered.
+      result: "Unchanged (format_version 1.1 preserved)."
+    - check: >-
+        No existing test modified (AC #12). `git diff --stat tests/`
+        shows only additions: test_bm25.py, test_bm25_integration.py,
+        and fixture files under tests/eval_fixtures/mini_index/.
+      result: "Confirmed additive."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: >-
+      No network, no subprocess, no new secrets. pickle load/dump over
+      a path in the user's own embeddings directory — same trust model
+      as the pre-existing _embeddings.faiss. rank_bm25 is pure-Python
+      numpy; no native extensions beyond what torch/faiss already
+      introduce. No new surface area for external input.
+  performance:
+    status: PASS
+    notes: >-
+      Within this story's scope — writing/reading artifacts — the
+      module is fast (20 tests in 0.05s; mini-corpus build is
+      instantaneous). O(total) rebuild-on-append at incremental time
+      is an explicit trade against vendoring rank_bm25, documented in
+      Dev Notes, and acceptable at Day 1 (incremental batches are
+      typically tens of chunks). No latency-sensitive path is wired
+      yet — search isn't surfaced to CLI/MCP/local_rag until 19.3. A
+      benchmark at ≥10k chunks is the right next step and is
+      recommended for 19.4's scope.
+  reliability:
+    status: PASS
+    notes: >-
+      Atomic writes via temp-file-then-rename (bytes + JSON helpers
+      local to bm25.py — correctly kept out of utils.py per dev-notes
+      option 2). Loader returns None for absent files (soft failure);
+      raises BM25FormatError with actionable rebuild hint for
+      tokenizer-identity or format-version mismatch (hard failure,
+      correct). Tombstone tracking is idempotent
+      (test_tombstone_idempotent verifies). Empty-corpus sentinel
+      distinguishes "index exists but empty" from "index absent", so
+      downstream callers can't confuse the two.
+  maintainability:
+    status: PASS
+    notes: >-
+      Single-file module (~430 lines) with a docstring that explains
+      the full contract (tokenizer identity, parallel-array
+      invariant, tombstone semantics, why rebuild-on-append). Tests
+      are readable and atomic. CLAUDE.md has a "BM25 Sidecar (Epic
+      19.1)" sub-section that documents file names, schema, migration
+      behavior, and parallel-array contract — exactly the minimum 19.2
+      needs to pick up without re-reading the PR.
+
+top_issues: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        Benchmark append_to_bm25_index at ≥10k chunks before 19.3
+        wires the hybrid into interactive paths. Dev Notes claim "a
+        few seconds on 100k chunks"; confirm on realistic data so
+        19.3's latency budget is set with measured numbers.
+      refs:
+        - "grounding/bm25.py"
+        - "docs/stories/19.1-bm25-index-builder.md"
+      suggested_owner: dev
+    - action: >-
+        When realistic private corpora land (same gating event as
+        Epic 18's rerank flip decision), verify tombstoned chunks'
+        IDF contribution is not meaningfully skewing BM25 scores. The
+        TOMBSTONE_WARNING_THRESHOLD of 0.20 is a sensible warning
+        threshold; confirm the "rebuild at 20%%" heuristic is
+        correct empirically.
+      refs:
+        - "grounding/bm25.py"
+        - "docs/epics/epic-19-hybrid-retrieval-bm25-dense.md"
+      suggested_owner: dev
+    - action: >-
+        Consider whether storing the tokenized corpus in
+        _bm25_map.json (instead of / in addition to the pickle attr)
+        would be worth the ~3-5× map-size cost to decouple append
+        correctness from pickle-internal state. Not urgent — current
+        BM25FormatError fallback handles the stale-pickle case
+        safely — but worth a line in 19.4's measurement summary.
+      refs:
+        - "grounding/bm25.py"
+      suggested_owner: dev
+    - action: >-
+        Epic 19.2 can assume the parallel-array contract holds. No
+        chunk-id remapping is needed; RRF merge is a pure dict lookup
+        on chunk_id keyed by (dense_rank, lexical_rank). This was
+        verified against the committed mini-corpus fixture.
+      refs:
+        - "docs/epics/epic-19-hybrid-retrieval-bm25-dense.md"
+      suggested_owner: dev
+
+waiver:
+  active: false
+
+history:
+  - date: "2026-04-15T20:30:00Z"
+    version: "1.0"
+    gate: PASS
+    quality_score: 100
+    note: >-
+      Initial review. All 12 ACs met. 20 tests pass in 0.05s.
+      Parallel-array contract verified against committed mini-corpus
+      fixture. FAISS format and existing tests confirmed untouched
+      (AC #12). Two non-obvious implementation choices (empty-corpus
+      None sentinel, namespaced tokenized-corpus attr on BM25Okapi)
+      are correct and cleanly documented. Gate PASS; Epic 19 starts
+      on a solid foundation.

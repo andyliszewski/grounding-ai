@@ -1,0 +1,15 @@
+doc_id: doc-alpha
+slug: alpha-paper
+orig_name: alpha.pdf
+collections:
+  - test
+strategy: test
+params:
+  chunk_size: 400
+  chunk_overlap: 0
+  parser: test
+  ocr_mode: "off"
+hashes:
+  file_sha1: 0000000000000000000000000000000000000001
+  blake3: 0000000000000000000000000000000000000000000000000000000000000001
+  sha256: 0000000000000000000000000000000000000000000000000000000000000001

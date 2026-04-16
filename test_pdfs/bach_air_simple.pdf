@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src='/extensions/common/jscss/mtcaptcha.loader.js'></script>
+</head>
+<body>
+    <div id='instructions'></div>
+    <div class='mtcaptcha'>Loading...</div><br />
+    <div id='reminder'></div>
+
+    <script>
+        function mtcaptchaRenderedCallback() {
+            document.getElementById('instructions').innerHTML = 'Please enter the letters below to continue:<br />';
+        }
+        function mtcaptchaCallback(mtcaptchaResponse) {
+            fetch('/wiki/Special:GM/getbotclearedtoken', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mtcaptcha_response: mtcaptchaResponse
+                })
+            })
+            .then(function(res){ return res.json(); })
+            .then(function(data){
+                if (data.client_token) {
+                    document.cookie = 'BOT_DETECT_CLEARED=' + data.client_token + '; path=/; Max-Age=' + (48*60*60) + '; SameSite=None; Secure';
+                } else {
+                    console.error('MTCaptcha: no client_token in response');
+                }
+
+                location.reload();
+            })
+            .catch(function(err){
+                console.error('MTCaptcha-token request failed:', err);
+                location.reload();
+            });
+        }
+
+        setTimeout(
+            () => document.getElementById('reminder').innerHTML = 'If you cannot get past this page, please e-mail eguo@imslp.org',
+            5000
+        );
+    </script>
+</body>
+</html>

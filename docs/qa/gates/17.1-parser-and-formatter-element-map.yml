@@ -1,0 +1,59 @@
+schema: 1
+story: "17.1"
+story_title: "Parser & Formatter Element Map"
+gate: PASS
+status_reason: "All 10 ACs implemented and covered by 15 unit tests (required 9 scenarios + 6 edge-case tests). `format_markdown` is preserved bit-for-bit; 12/12 existing formatter tests still pass. API is additive with frozen dataclasses, per-element dispatch, and a `_coverage_check` invariant asserted on every scenario. No new runtime dependencies."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-14T00:00:00Z"
+
+top_issues: []
+
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-28T00:00:00Z"
+
+evidence:
+  tests_reviewed: 27
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_partial: []
+    ac_gaps: []
+  notes:
+    - "AC1/3: `format_markdown_with_map(...) -> FormatResult` at formatter.py:249; `FormattedElement` and `FormatResult` frozen dataclasses at formatter.py:43-58 with required fields (`char_start`, `char_end`, `page_number`, `heading_stack`)."
+    - "AC2: `format_markdown` signature/behavior unchanged; all 12 existing tests in tests/test_formatter.py pass unmodified. Callers in pipeline.py/controller.py not touched (confirmed by story Dev Notes and grep)."
+    - "AC4: `_unstructured_page_number` reads `metadata.page_number`; `_classify_element` maps `category in {Title, Header}` to heading with level from `category_depth` (0→1-indexed, default 1). Covered by test_multi_page_pdf_elements_populate_page_numbers and test_heading_stack_nesting_h1_h2_h3."
+    - "AC5: TextElement path returns `page_number=None`, empty heading_stack by construction. Logged once at DEBUG per document via `textelement_seen` flag (formatter.py:319-323). Documented in module docstring lines 16-20. Covered by test_pdftotext_fallback_page_numbers_are_none."
+    - "AC6: Marker deferral documented in module docstring lines 22-25 — Marker-produced Markdown reaches formatter via TextElement path (raw-Markdown semantics, no pages). Story 17.2 will revisit sidecar-aware wiring."
+    - "AC7: `_coverage_check(markdown, elements)` enforces ordering, non-overlap, and non-whitespace coverage; called from test_coverage_check_invariant_on_mixed_inputs across all three paths (unstructured, raw-markdown, pdftotext). test_elements_are_ordered_by_char_start and test_element_spans_are_non_overlapping cover ordering/non-overlap explicitly."
+    - "AC8: `_compute_heading_stacks` pops entries at-or-deeper than the incoming level before pushing (formatter.py:196-199). test_heading_stack_nesting_h1_h2_h3 exercises h1→h2→h3→h1 (pops two). test_compute_heading_stacks_pops_equal_and_higher_levels covers sibling pop."
+    - "AC9: All 5 required scenarios present (multi-page PDF, single-page no-headings, EPUB-style no-pages, raw markdown, pdftotext fallback). 15 tests total, all pass in 0.02s, zero external dependencies."
+    - "AC10: Only stdlib additions (`re`, `dataclass`, extra typing imports). Verified via imports at formatter.py:29-35."
+    - "Full-suite run (`pytest tests/ --ignore=tests/test_integration.py`): 668 passed, 9 failed, 2 errors, 6 skipped. All 9 failures + 2 errors are preexisting per Dev A/B (git stash) verification — CLI parser choice, e2e embeddings, formula integration, parser/pipeline fixtures, perf benchmarks. None touch formatter.py."
+    - "Determinism preserved: `_normalize_block_text` mirrors `_normalize_markdown` (same line-ending normalization + rstrip). Element spans are pure functions of input; no timestamps or object ids leak into FormattedElement fields."
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "No external inputs, no shell-outs, no network. Regex `_HEADING_FIRST_LINE_RE` bounded to `#{1,6}\\s+.+?` with anchored start and non-greedy body — no catastrophic-backtracking surface. Front-matter rendering uses deterministic sorted-key iteration (no format-string injection from metadata values since all values pass through `str(...)`)."
+  performance:
+    status: PASS
+    notes: "O(n) over elements for map construction; `_coverage_check` is O(n + L) where L is markdown body length (bytearray scan). 15-test suite runs in 0.02s. No model loads, no I/O. Position math uses a running offset — no string searches per element."
+  reliability:
+    status: PASS
+    notes: "Invariants (ordered, non-overlapping, coverage) asserted in every test. Empty-input path returns `FormatResult(markdown='', elements=())`. Whitespace-only elements are skipped before map construction (test_whitespace_only_elements_are_skipped). String input rejected with TypeError (test_rejects_string_input). Front-matter offset correctly threaded into `char_start`/`char_end` (test_front_matter_offsets_element_positions)."
+  maintainability:
+    status: PASS
+    notes: "Module docstring cleanly states heading-detection rules, Marker deferral, and the TextElement/pdftotext semantics. Helpers are module-private (`_normalize_block_text`, `_compute_heading_stacks`, `_classify_element`, `_unstructured_page_number`, `_unstructured_heading_level`, `_coverage_check`) with single responsibilities. Frozen dataclasses give structural type-checking for downstream 17.2 consumers. No new runtime deps reduces dependency surface."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Remove module-level `importlib.reload(formatter_module)` from tests/test_formatter.py — it is unnecessary (the normal import already binds the module) and creates a test-isolation hazard: running `pytest tests/test_formatter_element_map.py tests/test_formatter.py` (element_map first on CLI) fails `test_multi_page_pdf_elements_populate_page_numbers` because the reload rebinds `FormatResult`, so `isinstance(result, FormatResult)` returns False even though the repr matches. Does NOT manifest in default alphabetical collection (test_formatter.py reloads before element_map imports), but exposes the new file to flakiness under explicit ordering, `-k` filters, or parallel runners."
+      refs: ["tests/test_formatter.py:11-12", "tests/test_formatter_element_map.py:56-67"]
+    - action: "Add a mixed-input smoke test (TextElement + unstructured stubs in the same batch) to lock in the per-element `_classify_element` dispatch contract. Current behavior is correct by construction but not explicitly asserted."
+      refs: ["grounding/formatter.py:225-246", "tests/test_formatter_element_map.py"]
+    - action: "Consider exposing `_compute_heading_stacks` as a named (module-private) utility for Story 17.2's chunker to reuse rather than re-deriving stacks from element records. Optional — depends on 17.2's design."
+      refs: ["grounding/formatter.py:178-200"]

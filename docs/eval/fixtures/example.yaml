@@ -1,0 +1,28 @@
+# Schema example only. Real-agent fixtures live in private repos
+# (grounding-ai-private, my-agents) or the mini test corpus under
+# tests/eval_fixtures/. Placeholder doc_ids below are NOT real corpus
+# entries and will not score meaningfully against a real FAISS index.
+
+agent: scientist
+version: 1
+items:
+  - id: ex-001
+    query: "What does Popper argue distinguishes science from pseudoscience?"
+    expected:
+      doc_ids: ["placeholder-doc-001"]
+      chunk_ids: ["placeholder-doc-001/ch_0023"]
+    tags: ["methodology", "philosophy-of-science"]
+    notes: "Illustrates chunk_ids + multiple tags + notes fields."
+
+  - id: ex-002
+    query: "Bootstrap confidence interval for a small sample mean"
+    expected:
+      doc_ids: ["placeholder-doc-002", "placeholder-doc-003"]
+    tags: ["statistics"]
+
+  - id: ex-003
+    query: "Falsifiability as a demarcation criterion"
+    expected:
+      doc_ids: ["placeholder-doc-001"]
+    tags: ["philosophy-of-science", "logic"]
+    notes: "Minimal item: required fields plus notes only."

@@ -1,0 +1,148 @@
+schema: 1
+story: "18.4"
+story_title: "Measure the Lift, Flip the Default, Refresh Baseline"
+gate: PASS
+status_reason: >-
+  All 11 ACs accounted for (two legitimately N/A per the conditional
+  null-result path blessed in Dev Notes). Measurement discipline is
+  exemplary: the dev chose to ship an honest null result rather than
+  manufacture a lift on a saturated mini corpus, which is exactly
+  what the Epic 16 eval harness exists to enforce. The in-scope
+  Story 18.3 gotcha fix (rerank provenance in the eval JSON header)
+  is cleanly additive — legacy flag-less callers still emit bit-for-bit
+  identical JSON, so the committed mini baseline stays valid. Mini
+  baseline gate re-run locally: worst_drop 0.000 → PASS. 106
+  rerank-adjacent tests green. Epic 18 closes cleanly.
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-15T19:50:00Z"
+expires: "2026-04-29T19:50:00Z"
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 106
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 3, 4, 5, 6, 7, 8, 9, 11]
+    ac_na: [2, 10]   # Both N/A per the conditional:
+                     # AC#2: no committed ≥10-item private fixture set exists;
+                     # AC#10: demo-regression PR only required on flip → no flip.
+    ac_gaps: []
+  test_runs:
+    - suite: >-
+        test_reranker.py, test_config_resolution.py,
+        test_local_rag_rerank.py, test_local_rag_cli_flags.py,
+        test_eval_cli.py, test_mcp_server_output.py,
+        test_search_corpus_tool.py
+      result: "106 passed in 6.65s"
+    - suite: >-
+        grounding eval --agent mini --agents-dir tests/eval_fixtures/agents
+        --fixtures tests/eval_fixtures/mini_fixtures.yaml
+        --corpus tests/eval_fixtures/mini_corpus
+        --embeddings tests/eval_fixtures/mini_index
+        --baseline docs/eval/baselines/mini-corpus.json
+        --fail-under 0.05
+      result: "PASS (worst_drop 0.000, exit 0)"
+    - suite: >-
+        grounding eval --agent mini ... --rerank --rerank-pool-size 5
+      result: >-
+        JSON payload["rerank"] = {enabled: true, pool_size: 5,
+        model: BAAI/bge-reranker-base, batch_size: 16}; legacy path
+        JSON has no rerank key (verified bit-for-bit compatibility).
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: >-
+      No new surface area. yaml.safe_load in the report path; no
+      network; no secrets. Config, baseline, and CI workflow all
+      untouched consistent with NO-FLIP decision.
+  performance:
+    status: PASS
+    notes: >-
+      Opt-in default preserved — pre-epic callers see no latency
+      change. CLAUDE.md latency table corrected from illustrative
+      ~300ms (pool=50) to measured ~1.8s median on Apple Silicon CPU
+      with host footnote and stable-ordering caveat; x86 AVX-512
+      boxes will run 3–6× faster. Good honest correction.
+  reliability:
+    status: PASS
+    notes: >-
+      Rerank provenance fix is strictly additive: RerankProvenance
+      dataclass is only attached to EvalRun when run_eval receives
+      a RerankConfig. JSON serializer gates on `is not None`.
+      Committed mini baseline still diff-compares cleanly with new
+      code (verified by re-running the gate → worst_drop 0.000).
+  maintainability:
+    status: PASS
+    notes: >-
+      Report schema docstring updated to mark `rerank` as optional.
+      Test assertion added for provenance. nDCG@10 > 1.0 quirk
+      filed as TD-002 with analysis and workaround — sensible scope
+      discipline to keep Epic 18 closed while the fix lives in its
+      own ticket.
+
+top_issues: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: >-
+        File a tracking task to re-run the rerank-on vs rerank-off
+        comparison once a ≥10-item private fixture set lands in
+        `grounding-ai-private` / `my-agents`. The README already
+        documents this as a follow-up; a concrete ticket would
+        prevent the "when realistic queries exist" contract from
+        becoming orphaned work.
+      refs:
+        - "docs/eval/README.md"
+        - "docs/epics/epic-18-cross-encoder-reranking.md"
+      suggested_owner: po
+    - action: >-
+        Address TD-002 (nDCG@10 ideal-DCG normalization). Small
+        scope, recall@k and citation_accuracy already carry flip
+        decisions, so this is cosmetic until someone tries to
+        interpret nDCG@10 as an absolute number.
+      refs: ["docs/TECH-DEBT.md", "grounding/eval/metrics.py"]
+      suggested_owner: dev
+    - action: >-
+        Clean up pre-existing `marker` parser-choice test failures
+        in test_cli.py, test_parser.py, test_pipeline.py,
+        test_e2e_embeddings.py, test_formula_integration.py, and
+        the collection error in test_integration.py. Unrelated to
+        Epic 18 but flagged by the dev during this review.
+      refs:
+        - "tests/test_cli.py"
+        - "tests/test_parser.py"
+        - "tests/test_pipeline.py"
+        - "tests/test_e2e_embeddings.py"
+        - "tests/test_formula_integration.py"
+        - "tests/test_integration.py"
+      suggested_owner: dev
+    - action: >-
+        Carry-over from 18.3 gate: lift _resolve_rerank_config_from_args
+        into grounding/config.py with an on_error callback to remove
+        the duplication between grounding/eval/cli.py and
+        scripts/local_rag.py.
+      refs:
+        - "grounding/config.py"
+        - "grounding/eval/cli.py"
+        - "scripts/local_rag.py"
+      suggested_owner: dev
+
+waiver:
+  active: false
+
+history:
+  - date: "2026-04-15T19:50:00Z"
+    version: "1.0"
+    gate: PASS
+    quality_score: 100
+    note: >-
+      Initial review. All ACs accounted for (AC#2, AC#10 N/A per
+      conditional). In-scope 18.3 gotcha fix (JSON rerank provenance)
+      verified bit-for-bit backward-compatible with committed baseline.
+      Mini baseline gate re-run → PASS (worst_drop 0.000). 106
+      rerank-adjacent tests green. Epic 18 closes cleanly with the
+      honest null result and opt-in default.

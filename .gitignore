@@ -1,0 +1,100 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Output directory
+out/
+corpus/
+originals/
+
+# User content (not distributed)
+context
+embeddings
+staging/*
+!staging/.gitkeep
+omr_poc_output/
+*_poc_output/
+
+# Personal agent configs (use agents/examples/ as templates)
+agents/*.yaml
+!agents/examples/
+
+# Personal slash commands (use .claude/commands/examples/ as templates)
+.claude/commands/*.md
+!.claude/commands/examples/
+
+# Personal config (copy from .mcp.example.json and config.example.yaml)
+.mcp.json
+config.yaml
+
+# BMad Method (install with: npx bmad-method install)
+.bmad-core/
+_bmad/
+_bmad-output/
+
+# Personal docs
+OSINT-RESOURCES.md
+WORKFLOW.md
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Built FAISS index for the mini eval corpus (rebuilt on demand by CI + locally)
+tests/eval_fixtures/mini_index/
+
+# Eval run reports (generated on demand; see docs/eval/baselines/ for committed baselines)
+docs/eval/reports/
+
+# Claude Code runtime
+.claude/scheduled_tasks.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+tmp.txt
+*.tmp
+
+# POC and test files
+poc_*.py
+*.jdk
+
+# External installers/binaries
+*.deb
+=0.9.0

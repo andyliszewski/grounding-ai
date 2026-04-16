@@ -1,0 +1,69 @@
+schema: 1
+story: "16.2"
+story_title: "Runner and Metrics"
+gate: PASS
+status_reason: "Re-review after dev applied NIT-1 and NIT-2 fixes (story v1.3). 46 tests still green in 0.17s. Only remaining item is NIT-3 (chunk-id schema reconciliation) which is a PO decision inherited from 16.1 and correctly deferred."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-13T00:00:00Z"
+
+top_issues:
+  - id: "NIT-3"
+    severity: low
+    title: "Chunk-id schema divergence between 16.1 docs and 16.2 runner"
+    location: "grounding/eval/runner.py:286-295"
+    note: |
+      Dev flagged this explicitly in the story. 16.1's fixture schema documents
+      `<doc_id>/ch_NNNN` but live chunk_maps emit `<doc_id>-NNNN`. Runner tolerates
+      both, which unblocks today's indices but leaves the README example misleading.
+      Needs PO decision (relax 16.1 regex vs. backfill chunk-id format). Tracked in
+      story Follow-ups section; not a 16.2 blocker.
+
+waiver: { active: false }
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 18
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+  notes:
+    - "pytest tests/test_eval_metrics.py tests/test_eval_runner.py tests/test_eval_runner_integration.py tests/test_eval_fixtures.py -q → 46 passed in 0.12s"
+    - "AC3 (reuse) verified by grep: runner delegates to grounding.embedder.generate_embedding, grounding.vector_store.{load_vector_index, search_similar_chunks}, grounding.manifest.ManifestManager — vector_store.py unchanged"
+    - "AC4 per-item shape verified in EvalItemResult (doc_id, chunk_id, score, rank + first_hit_rank + strict_first_hit_rank)"
+    - "AC6 strict chunk-level match tested in test_runner_records_strict_first_hit_rank_when_chunk_ids_provided"
+    - "AC7 skip + WARN verified in test_runner_skips_unknown_doc_id_with_warning via caplog"
+    - "AC9 integration test uses deterministic 3-topic stub embedder (documented rationale: avoids ~80MB sentence-transformers download); real-embedding smoke test deferred to 16.4"
+    - "AC10 runtime is 0.12s — 83× under budget"
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "Read-only; yaml.safe_load via 16.1 loader. No network, no deserialization, no writes outside test tmp dirs."
+  performance:
+    status: PASS
+    notes: "O(n·top_k) where n=|fixtures|; fixtures are small by design. Integration test runs full FAISS roundtrip in <50ms."
+  reliability:
+    status: PASS
+    notes: "Skipped-items policy prevents corpus churn from silently degrading scores; agent mismatch raises ValueError; frozen dataclasses prevent result mutation."
+  maintainability:
+    status: PASS
+    notes: "NIT-1 and NIT-2 resolved in v1.3. Docstring on compute_aggregate documents the top_k equivalence and advises the 16.3 report layer to surface top_k alongside the metrics."
+
+downstream_impact:
+  - story: "16.3"
+    impact: "Wraps run_eval and serializes EvalRun. Report layer should surface top_k alongside recall_at_10/ndcg_at_10 per the docstring note added in v1.3."
+  - story: "16.4"
+    impact: "CI baseline diff; also responsible for real-embedding smoke test (deferred from 16.2 AC9 per dev note)."
+
+expires: "2026-04-27T00:00:00Z"
+
+review_history:
+  - date: "2026-04-13"
+    gate: PASS
+    note: "Initial review. All 10 ACs met, 46 tests green in 0.12s. Three low-severity nits flagged (two code smells, one schema-alignment item inherited from 16.1)."
+  - date: "2026-04-13"
+    gate: PASS
+    note: "Re-review after dev applied NIT-1 and NIT-2 fixes (story v1.3). Verified runner.py:242 threads top_k=top_k, runner.py:263/265 drop the min() cap, docstring on compute_aggregate documents the equivalence. 46 tests still green in 0.17s. Quality score 95 → 100. Only NIT-3 remains, and it is a PO decision (not a 16.2 blocker)."

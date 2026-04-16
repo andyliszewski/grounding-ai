@@ -1,0 +1,61 @@
+# Quality Gate: Story 12.3
+schema: 1
+story: "12.3"
+story_title: "CLI Integration"
+gate: PASS
+status_reason: "All 8 acceptance criteria fully covered by 24 passing tests. Clean integration preserves backward compatibility while adding agentic mode support."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-02-23T13:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+expires: "2026-03-09T00:00:00Z"
+
+evidence:
+  tests_reviewed: 24
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  _assessed: [security, performance, reliability, maintainability]
+  security:
+    status: PASS
+    notes: "No new security concerns, existing protections preserved"
+  performance:
+    status: PASS
+    notes: "No regression, resources reused efficiently"
+  reliability:
+    status: PASS
+    notes: "Error handling preserved, graceful mode selection"
+  maintainability:
+    status: PASS
+    notes: "24 tests, clean separation of simple RAG and agentic paths"
+
+risk_summary:
+  totals:
+    critical: 0
+    high: 0
+    medium: 0
+    low: 3
+  highest:
+    id: REL-001
+    score: 2
+    title: "Module-level imports for optional agentic features"
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider lazy imports for agentic module"
+      refs: ["scripts/local_rag.py:50-51"]
+    - action: "Add model detection from API response"
+      refs: ["scripts/local_rag.py:344, 441"]
+    - action: "Add integration tests with real CLI execution"
+      refs: ["tests/test_local_rag_cli.py"]
