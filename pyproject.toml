@@ -6,10 +6,21 @@ build-backend = "setuptools.build_meta"
 name = "grounding-ai"
 version = "0.3.0"
 description = "Local-first document corpus pipeline for grounded AI agents"
-authors = [{name = "Andy"}]
+authors = [{name = "Andy Liszewski"}]
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.13,<3.14"
 license = {text = "MIT"}
+keywords = ["rag", "retrieval", "embeddings", "corpus", "local-first", "faiss", "document-processing", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Indexing",
+]
 
 dependencies = [
     "unstructured>=0.15.0",
@@ -32,6 +43,11 @@ dependencies = [
     "typer>=0.9.0",
     "rank_bm25>=0.2.2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/andyliszewski/grounding-ai"
+Repository = "https://github.com/andyliszewski/grounding-ai"
+Issues = "https://github.com/andyliszewski/grounding-ai/issues"
 
 [project.scripts]
 grounding = "grounding.cli:main"
