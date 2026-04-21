@@ -1,5 +1,6 @@
 # Grounding
 
+[![CI](https://github.com/andyliszewski/grounding-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/andyliszewski/grounding-ai/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/grounding-ai.svg)](https://pypi.org/project/grounding-ai/)
 [![Python versions](https://img.shields.io/pypi/pyversions/grounding-ai.svg)](https://pypi.org/project/grounding-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
