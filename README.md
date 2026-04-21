@@ -40,6 +40,17 @@ Documents (PDF/EPUB/DOCX/MD)
 - **Fully local** -- no cloud APIs, no telemetry, your documents stay on your machine
 - **Agentic RAG** -- local LLMs autonomously decide when to search the corpus via tool calling
 
+## Why Grounding? (vs. LlamaIndex / Haystack / txtai)
+
+Grounding is an opinionated pipeline, not a framework:
+
+- **Per-agent FAISS partitioning as a first-class primitive.** Each agent YAML defines a corpus slice and gets its own index -- no single monolithic index where unrelated domains compete for top-k. Other frameworks treat this as a filter you bolt on at query time; here it's the core data model.
+- **Determinism and provenance for citable output.** Every chunk carries SHA-1 / SHA-256 / BLAKE3 hashes, page ranges, and section headings; same inputs produce byte-identical chunks. Built for agents that must cite sources.
+- **Local-first by construction.** No cloud APIs, no telemetry. Runs against Ollama or any OpenAI-compatible local server. Cloud isn't a default path -- it's not a path at all.
+- **Opinionated fixed pipeline** (parse → chunk → hash → index → query). Less surface area than a framework, less to configure, less to break.
+
+Use LlamaIndex / Haystack if you want a framework to assemble custom retrieval flows. Use grounding-ai if you want a citation-grade local RAG pipeline with per-agent separation, working today.
+
 ## Quick Start
 
 ### Install from PyPI
