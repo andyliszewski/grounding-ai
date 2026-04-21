@@ -55,3 +55,9 @@ grounding = "grounding.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["grounding*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: tests requiring external resources (PDFs, models, filesystem pipelines)",
+    "slow: tests slow enough to exclude from default CI unit-test runs",
+]

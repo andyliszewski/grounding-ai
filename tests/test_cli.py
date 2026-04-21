@@ -89,11 +89,11 @@ class TestCLIValidation:
         result = run_cli(
             str(pdf_dir),
             str(tmp_path / "out"),
-            "--parser", "marker",
+            "--parser", "unstructured",
             "--dry-run"
         )
         assert result.returncode == 0
-        assert "parser: marker" in result.stdout.lower()
+        assert "parser: unstructured" in result.stdout.lower()
 
     def test_ocr_mode_validation(self, pdf_dir: Path, tmp_path: Path):
         """Test OCR mode is validated."""

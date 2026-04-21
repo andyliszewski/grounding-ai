@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, List
 
@@ -311,6 +312,7 @@ def test_run_pipeline_rejects_invalid_ocr_mode(tmp_path: Path) -> None:
 def test_run_pipeline_detects_doc_id_collision(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
+    logging.getLogger("grounding").propagate = True
     caplog.set_level("WARNING", logger="grounding.pipeline")
     pdfs = create_pdfs(tmp_path / "pdfs", ["first.pdf", "second.pdf"])
 
@@ -393,6 +395,7 @@ def test_run_pipeline_clean_removes_existing_outputs(monkeypatch: pytest.MonkeyP
 
 
 def test_run_pipeline_dry_run_skips_file_ops(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    logging.getLogger("grounding").propagate = True
     pdfs = create_pdfs(tmp_path / "pdfs", ["doc.pdf"])
     out_dir = tmp_path / "out"
     out_dir.mkdir()
@@ -420,7 +423,7 @@ def test_run_pipeline_dry_run_skips_file_ops(monkeypatch: pytest.MonkeyPatch, tm
         dry_run=True,
     )
 
-    caplog.set_level("INFO")
+    caplog.set_level("DEBUG")
     run_pipeline(config, files=pdfs)
 
     assert (out_dir / "existing.txt").exists()

@@ -1,0 +1,41 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Cache sentence-transformers model
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/torch/sentence_transformers
+            ~/.cache/huggingface
+          key: st-${{ runner.os }}-all-MiniLM-L6-v2-v1
+
+      - name: Install grounding-ai and test deps
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Run unit tests
+        run: pytest -m "not integration and not slow" --tb=short -q
