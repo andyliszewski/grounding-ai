@@ -8,16 +8,14 @@ from typing import List
 
 import hashlib
 import pytest
-from typer.testing import CliRunner
 
-from grounding.cli import app
+pytestmark = pytest.mark.integration
+
 from grounding.controller import run_controller
 from grounding.formatter import FormatError
 from grounding.parser import ParseError
 from grounding.pipeline import PipelineConfig
 from tests.integration_utils import copy_fixtures, hash_directory
-
-runner = CliRunner()
 
 
 def _install_stubs(

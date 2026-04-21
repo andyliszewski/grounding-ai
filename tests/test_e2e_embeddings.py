@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def temp_corpus(tmp_path):

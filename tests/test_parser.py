@@ -46,6 +46,7 @@ def reset_partition_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pdf_mod, "partition_pdf", _stub)
 
 
+@pytest.mark.integration
 def test_parse_pdf_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
     logging.getLogger("grounding").propagate = True
     caplog.set_level(logging.INFO, logger="grounding.parser")
@@ -75,7 +76,10 @@ def test_parse_pdf_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capl
     [
         ("auto", "auto"),
         ("on", "always"),
-        ("off", "never"),
+        pytest.param(
+            "off", "never",
+            marks=pytest.mark.integration,
+        ),
         ("AUTO", "auto"),
     ],
 )
