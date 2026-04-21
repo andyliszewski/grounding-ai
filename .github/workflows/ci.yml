@@ -37,5 +37,19 @@ jobs:
           pip install -e .
           pip install pytest
 
+      - name: Cache mini FAISS index
+        id: cache-mini-index
+        uses: actions/cache@v4
+        with:
+          path: tests/eval_fixtures/mini_index
+          key: mini-index-${{ runner.os }}-${{ hashFiles('tests/eval_fixtures/mini_corpus/**/*.md', 'tests/eval_fixtures/mini_corpus/_index.json', 'grounding/embedder.py', 'grounding/vector_store.py', 'grounding/bm25.py') }}
+
+      - name: Build mini FAISS + BM25 index
+        if: steps.cache-mini-index.outputs.cache-hit != 'true'
+        run: |
+          grounding embeddings \
+            --corpus tests/eval_fixtures/mini_corpus \
+            --out tests/eval_fixtures/mini_index
+
       - name: Run unit tests
         run: pytest -m "not integration and not slow" --tb=short -q
