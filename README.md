@@ -456,6 +456,22 @@ A GitHub Actions workflow runs the harness on every PR that touches retrieval
 code and fails the check if any aggregate metric drops more than the configured
 threshold relative to a committed baseline.
 
+**Public CI gate = regression trip-wire, not a quality benchmark.** The mini
+corpus is three synthetic documents (`alpha-paper`, `beta-study`, `gamma-notes`).
+Metrics on it are saturated at `recall@5 = 1.000` / `citation_accuracy = 1.000`
+by design — the gate exists to trip when a retrieval-code change drops them,
+not to rank retrieval configurations. Sample runs are checked in:
+
+- [Latest mini-corpus eval run](docs/eval/reports/mini-20260415-231110.md) — full per-item breakdown
+- [All mini-corpus runs](docs/eval/reports/)
+
+**Real quality measurement** runs against private-corpus fixtures that can't
+be publicly distributed. That's where the rerank / hybrid flip decisions
+(Stories 18.4 and 19.4) are made. See the
+[three-repo layering](docs/eval/README.md#three-repo-layering) section for the
+division of concerns: public repo guards retrieval-code regressions; private
+runs guard corpus-quality regressions.
+
 See [`docs/eval/README.md`](docs/eval/README.md) for the fixture schema, CLI
 usage, CI gate details, and the baseline-refresh procedure.
 
