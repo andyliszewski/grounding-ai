@@ -34,8 +34,14 @@ RUN apt-get update \
 # the full CUDA wheel (saves ~7 GB on the final image).
 RUN pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.0.0"
 
+# starlette is floored at >=1.0.1 for CVE-2026-48710 ("BadHost"): older
+# Starlette fails to validate the Host header and poisons request.url.path.
+# It arrives transitively via mcp (floored only at >=0.27). This server runs
+# over stdio (no HTTP listener) so the vector is not exploitable here, but the
+# explicit floor keeps a known-vulnerable Starlette out of the image.
 RUN pip install \
     "mcp>=1.0.0" \
+    "starlette>=1.0.1" \
     "faiss-cpu>=1.7.0" \
     "sentence-transformers>=2.2.0" \
     "pyyaml>=6.0" \
