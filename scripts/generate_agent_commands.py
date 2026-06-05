@@ -51,7 +51,7 @@ When researching answers, first consult your curated corpus of reference materia
 ## Research Methodology
 
 **IMPORTANT**: Follow this protocol for all domain questions:
-
+{formula_policy}
 1. **CORPUS FIRST**: Always search your corpus before answering:
    ```
    mcp__corpus_search__search_corpus(query="<your search terms>", agent="{name}", top_k=5)
@@ -134,6 +134,34 @@ def format_local_context(config: dict) -> str:
     return "\n".join(lines)
 
 
+# Canonical wording for the formula-verification rule. Rendered into the
+# Research Methodology section for agents that opt in via `verify_formulas: true`.
+# Quant/technical agents set the flag; creative/humanities agents leave it unset.
+FORMULA_INTEGRITY_CALLOUT = (
+    "> ⚠️ **FORMULA INTEGRITY — verify before you calculate:** Corpus / grounding-ai "
+    "formula ingestion (OCR and text extraction) is **unreliable**; equations, constants, "
+    "and symbols drawn from the corpus may be silently corrupted. Treat any formula, "
+    "equation, or numeric constant cited from the corpus as **UNVERIFIED**. Before using a "
+    "corpus-sourced formula in a calculation, cross-check it against a reliable primary "
+    "source online (authoritative textbook, standards body, peer-reviewed reference, or "
+    "official documentation) and **cite that source alongside the corpus citation** in both "
+    "your written documentation and your answer. Never compute with an unverified or "
+    "uncited formula."
+)
+
+
+def format_formula_policy(config: dict) -> str:
+    """Render the FORMULA INTEGRITY callout when the agent opts in.
+
+    Slots between the Research Methodology intro line and the first numbered
+    step. Returns "" when `verify_formulas` is falsy so the surrounding blank
+    line is preserved unchanged.
+    """
+    if not config.get("verify_formulas"):
+        return ""
+    return "\n" + FORMULA_INTEGRITY_CALLOUT + "\n"
+
+
 def generate_display_name(name: str) -> str:
     """Convert agent name to display format (e.g., 'corp-dev-friendly' -> 'Corp Dev Friendly').
 
@@ -186,6 +214,7 @@ def generate_command_content(config: dict) -> str:
         expertise_list=format_expertise_list(expertise),
         collections=format_collections(collections) if collections else "No specific collections defined",
         local_context=format_local_context(config),
+        formula_policy=format_formula_policy(config),
         greeting=greeting,
         citation_corpus_example=citation_corpus_example,
         citation_web_example=citation_web_example,
