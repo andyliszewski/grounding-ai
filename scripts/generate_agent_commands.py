@@ -44,8 +44,7 @@ Your knowledge is grounded in documents from these collections:
 {collections}
 
 When researching answers, first consult your curated corpus of reference materials for authoritative information before drawing on general knowledge. If a topic falls outside your collections, acknowledge the limitation.
-
-## Embeddings Path
+{local_context}## Embeddings Path
 
 `embeddings/{name}/_embeddings.faiss`
 
@@ -102,6 +101,39 @@ def format_collections(collections: list[str]) -> str:
     return ", ".join(collections)
 
 
+def format_local_context(config: dict) -> str:
+    """Render the '## Local Context' section from local_workspace/shared_context.
+
+    Returns a block that slots between the Corpus Scope paragraph and the
+    Embeddings Path heading. If the agent has no local_workspace, returns a
+    single newline so the surrounding blank line is preserved.
+    """
+    workspace = config.get("local_workspace")
+    if not workspace:
+        return "\n"
+
+    lines = [
+        "",
+        "## Local Context",
+        "",
+        f"Your working context folder is `{workspace}`.",
+        "",
+        "When the user references a specific project, document, company, or "
+        "initiative by name (for example, a project or product codename), "
+        "**check this folder FIRST** — use Read, Grep, and Glob to find and read relevant files "
+        "here before searching your corpus or the web. Files in this folder are "
+        "user-curated and authoritative for the work they cover. If nothing here "
+        "is relevant, fall back to your corpus and the research methodology below.",
+    ]
+    shared = config.get("shared_context") or []
+    if shared:
+        lines += ["", "You may also read from these related agents' context folders:"]
+        for item in shared:
+            lines.append(f"- `{item['path']}` ({item['agent']} agent)")
+    lines += ["", ""]
+    return "\n".join(lines)
+
+
 def generate_display_name(name: str) -> str:
     """Convert agent name to display format (e.g., 'corp-dev-friendly' -> 'Corp Dev Friendly').
 
@@ -153,6 +185,7 @@ def generate_command_content(config: dict) -> str:
         style=style,
         expertise_list=format_expertise_list(expertise),
         collections=format_collections(collections) if collections else "No specific collections defined",
+        local_context=format_local_context(config),
         greeting=greeting,
         citation_corpus_example=citation_corpus_example,
         citation_web_example=citation_web_example,
