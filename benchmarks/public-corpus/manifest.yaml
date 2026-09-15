@@ -1,0 +1,433 @@
+# Public-domain benchmark corpus for the Epic 25 grounded-answer benchmark.
+#
+# Every entry is a US federal government work (17 U.S.C. 105) or carries a public-release
+# distribution statement, so anyone can rebuild the corpus from this file alone:
+#
+#   ./venv/bin/python benchmarks/public-corpus/fetch.py            # download + verify SHA-256
+#   benchmarks/public-corpus/build.sh                              # fetch, ingest, embed
+#
+# Field guide (one mapping per document, under `documents:`):
+#   id            short kebab slug; the PDF is saved as originals/<id>.pdf and the corpus slug
+#                 is derived from that filename, so id == corpus slug
+#   number        document number, revision and date
+#   url           the URL fetch.py tries first; fallback_url is tried when url fails
+#   collections   corpus collection tags passed to `grounding --collections` at ingestion
+#   sha256/bytes  of the file as fetched; recorded by `fetch.py --record`, verified afterwards
+#   pages         PDF page count (pypdf, falling back to pdfinfo), recorded by --record
+#   last_modified the HTTP Last-Modified header seen at fetch time (FDA re-posts PDFs at the
+#                 same URL, so this plus sha256 pins the edition actually used)
+#   fetched_from  "url" or "fallback_url", whichever produced the recorded hash
+#   public_basis  why the document is public, as one of these keys (see README.md):
+#                 [G] 17 U.S.C. 105; [F] FDA website policy; [N] NASA Technical Standards
+#                 System "Internet Public"; [T] NTRS distribution PUBLIC; [A] Distribution
+#                 Statement A on the cover; [Q] ASSIST QuickSearch Dist Stmt A; [R] DTIC public
+#                 site carries only unclassified, unlimited reports
+#   category_hint benchmark question categories the document is likely to back:
+#                 table | formula | standard | guidance | judgment
+#
+# Sources vetted 2026-09-14 against the agency landing pages, NTRS, OSTI, the Federal
+# Register API and DLA ASSIST; each entry's public basis is recorded below. This file was
+# written by hand and is rewritten in place by fetch.py --record, which keeps this header
+# and the field order.
+
+documents:
+- id: fda-spinal-system-510k-2004
+  title: 'Guidance for Industry and FDA Staff: Spinal System 510(k)s'
+  agency: FDA CDRH
+  number: Final guidance, issued May 3, 2004 (supersedes the Sept 27, 2000 version); docket FDA-2020-D-0957; CDRH doc 636
+  url: https://www.fda.gov/media/71604/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 986eae46601e2b30f503afd35f43bc9e017ee21f3d728a18d49c5f65ea970bec
+  bytes: 387039
+  pages: 23
+  last_modified: Mon, 08 Oct 2018 16:38:30 GMT
+  fetched_utc: '2026-09-15T01:31:46Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, table, standard]
+  notes: Tables 1a/1b map spinal system type to product code and 21 CFR 888 section; Tables 3a/3b list recommended tests (6 or more samples, AF/N curve to 5 million cycle runout, ASTM F1717 and F1798).
+- id: fda-ibfd-special-controls-2007
+  title: 'Class II Special Controls Guidance Document: Intervertebral Body Fusion Device'
+  agency: FDA CDRH
+  number: Final guidance, June 12, 2007 (72 FR 32299); docket 2006D-0020
+  url: https://www.fda.gov/media/90325/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 0d56d1458b92ea198504b13a3569f3a8a50a780a8afd7600c32e42330c25c0ca
+  bytes: 190128
+  pages: 19
+  last_modified: Mon, 08 Oct 2018 20:15:26 GMT
+  fetched_utc: '2026-09-15T01:31:47Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, standard]
+  notes: The special control named in 21 CFR 888.3080. Recommended 510(k) content and testing for IBFDs.
+- id: fda-nonspinal-bone-screws-perf-criteria-2024
+  title: Orthopedic Non-Spinal Metallic Bone Screws and Washers - Performance Criteria for Safety and Performance Based Pathway
+  agency: FDA CDRH
+  number: Final guidance, first issued December 2020 (FR 2020-27248); PDF and landing page dated November 2024; docket FDA-2019-D-1652
+  url: https://www.fda.gov/media/130866/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 408c0de0956f2c695e59fc2329fb3b97d64a31f036085e6c6930b3f0bbc5a63b
+  bytes: 452090
+  pages: 11
+  last_modified: Thu, 21 Nov 2024 14:05:18 GMT
+  fetched_utc: '2026-09-15T01:31:47Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, table, judgment]
+  notes: Numeric acceptance criteria with test methods (insertion/removal torque vs torsional yield, bone foam density). Confirm the final values against the PDF before writing questions.
+- id: fda-spinal-plating-perf-criteria-2020
+  title: Spinal Plating Systems - Performance Criteria for Safety and Performance Based Pathway
+  agency: FDA CDRH
+  number: Final guidance, December 2020 (FR 2020-27248); docket FDA-2019-D-1647
+  url: https://www.fda.gov/media/130867/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: c372545d4332e306360efb3950a64cfe09c57f42877188295ae6abf99ef07696
+  bytes: 474280
+  pages: 10
+  last_modified: Thu, 10 Dec 2020 13:55:17 GMT
+  fetched_utc: '2026-09-15T01:31:47Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, table]
+  notes: Criteria drawn from aggregated 510(k) test data. Static compression bending, static torsion and dynamic compression bending per ASTM F1717.
+- id: fda-modified-metallic-surfaces-1994
+  title: Guidance Document for Testing Orthopedic Implants with Modified Metallic Surfaces Apposing Bone or Bone Cement
+  agency: FDA CDRH
+  number: Final guidance, April 1994; docket FDA-2020-D-0957
+  url: https://www.fda.gov/media/72781/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 49f821173c303f19452677e64ade6df7cb52a950befa9cba459b960bb5a62ce4
+  bytes: 27374
+  pages: 10
+  last_modified: Mon, 08 Oct 2018 16:47:22 GMT
+  fetched_utc: '2026-09-15T01:31:47Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, standard]
+  notes: Short checklist for characterizing porous and other modified surfaces (layer thickness, particle and pore size and shape). The January 2024 draft coatings guidance is not final and is not included.
+- id: fda-reporting-computational-modeling-2016
+  title: Reporting of Computational Modeling Studies in Medical Device Submissions
+  agency: FDA CDRH
+  number: Final guidance, September 2016; docket FDA-2013-D-1530
+  url: https://www.fda.gov/media/87586/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: dffcc0dc28367f5a4fff187c8605ed828931445a79b83a04f0ac33f73295d36e
+  bytes: 790189
+  pages: 48
+  last_modified: Mon, 08 Oct 2018 16:48:51 GMT
+  fetched_utc: '2026-09-15T01:31:48Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, standard]
+  notes: Recommended outline of a CM&S (FEA) report; code verification, system configuration, governing equations, material properties, boundary conditions, mesh, validation, limitations.
+- id: fda-cms-credibility-2023
+  title: Assessing the Credibility of Computational Modeling and Simulation in Medical Device Submissions
+  agency: FDA CDRH
+  number: Final guidance, November 2023; docket FDA-2021-D-0980
+  url: https://www.fda.gov/media/154985/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: b596eabe08b0d27b77ebc8d5fc0b0662084be54d18e70845b231de9a99ce1f92
+  bytes: 1368280
+  pages: 42
+  last_modified: Thu, 16 Nov 2023 16:05:39 GMT
+  fetched_utc: '2026-09-15T01:31:48Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, judgment]
+  notes: Risk-informed credibility framework; question of interest, context of use, model influence, decision consequence, credibility evidence. Pairs with NASA-STD-7009B.
+- id: fda-iso-10993-1-use-2023
+  title: 'Use of International Standard ISO 10993-1, "Biological evaluation of medical devices - Part 1: Evaluation and testing within a risk management process"'
+  agency: FDA CDRH
+  number: Final guidance, September 2023; docket FDA-2013-D-0350
+  url: https://www.fda.gov/media/142959/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 785a0c14ccd4471b5aecae34678327fa6bef29b3230653e910b7baf9188689eb
+  bytes: 1306129
+  pages: 71
+  last_modified: Tue, 03 Feb 2026 20:47:46 GMT
+  fetched_utc: '2026-09-15T01:31:48Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, table]
+  notes: Biocompatibility endpoints by contact type and duration (endpoint table), test article preparation, chemical characterization. FDA re-posted this PDF on 2026-02-03 (Last-Modified); the recorded hash pins the copy used.
+- id: fda-510k-program-substantial-equivalence-2014
+  title: 'The 510(k) Program: Evaluating Substantial Equivalence in Premarket Notifications [510(k)]'
+  agency: FDA CDRH
+  number: Final guidance, July 28, 2014; docket FDA-2011-D-0652; CDRH doc 1766
+  url: https://www.fda.gov/media/82395/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 06a64f30e22a3cf02534defcc29e9c605ea6c9404e20b84cca618e2b8ee93d29
+  bytes: 864149
+  pages: 42
+  last_modified: Mon, 08 Oct 2018 16:48:17 GMT
+  fetched_utc: '2026-09-15T01:31:49Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, judgment]
+  notes: Substantial-equivalence decision flowchart, predicate selection, intended use versus indications, different technological characteristics.
+- id: fr-qmsr-final-rule-2024
+  title: Medical Devices; Quality System Regulation Amendments (QMSR final rule)
+  agency: FDA, published in the Federal Register (govinfo)
+  number: Final rule, 89 FR 7496 to 7525, February 2, 2024; effective February 2, 2026; docket FDA-2021-N-0507; RIN 0910-AH99
+  url: https://www.govinfo.gov/content/pkg/FR-2024-02-02/pdf/2024-01709.pdf
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: 9b0afa95e8a71a033b4fbf07b780864a5fed1a073e391b383dd11daf5bbd97f1
+  bytes: 506729
+  pages: 30
+  last_modified: Mon, 22 Sep 2025 23:39:47 GMT
+  fetched_utc: '2026-09-15T01:31:49Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; official Federal Register edition on govinfo'
+  category_hint: [guidance, standard]
+  notes: Amended 21 CFR 820 text (incorporates ISO 13485:2016 by reference) plus the preamble's responses to comments. Printed pages are Federal Register pages 7496 to 7525.
+- id: fda-bench-performance-testing-2019
+  title: Recommended Content and Format of Non-Clinical Bench Performance Testing Information in Premarket Submissions
+  agency: FDA CDRH
+  number: Final guidance, December 20, 2019; docket FDA-2018-D-1329
+  url: https://www.fda.gov/media/113230/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: dc863ba8455e25008fb53812e840b43022b9e6abab5520ff89bc5e77c7309b26
+  bytes: 392969
+  pages: 12
+  last_modified: Tue, 17 Dec 2019 21:06:55 GMT
+  fetched_utc: '2026-09-15T01:31:50Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, standard]
+  notes: Elements of a complete test report; objective, sample size rationale, pass/fail criteria, deviations, results, conclusions.
+- id: fda-mr-safety-testing-labeling-2023
+  title: Testing and Labeling Medical Devices for Safety in the Magnetic Resonance (MR) Environment
+  agency: FDA CDRH
+  number: Final guidance, October 2023; docket FDA-2019-D-2837
+  url: https://www.fda.gov/media/74201/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: cc53fb71b57ab3df9abb9d6d81a2fd0f5c8b8bda8df60e315589f7132636e29b
+  bytes: 1068403
+  pages: 32
+  last_modified: Tue, 10 Oct 2023 15:04:47 GMT
+  fetched_utc: '2026-09-15T01:31:50Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [guidance, table]
+  notes: MR Conditional labeling items; test types for implants (magnetically induced force and torque, RF heating, image artifact).
+- id: fda-510k-for-device-change-2017
+  title: Deciding When to Submit a 510(k) for a Change to an Existing Device
+  agency: FDA CDRH
+  number: Final guidance, October 2017; docket FDA-2011-D-0453
+  url: https://www.fda.gov/media/99812/download
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: b20870151ab63bf61e21cbc4730a459317bd1fc9339da8099c8e557d6d466f34
+  bytes: 775747
+  pages: 78
+  last_modified: Fri, 06 Feb 2026 17:44:28 GMT
+  fetched_utc: '2026-09-15T01:31:50Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [F] FDA website policy: fda.gov contents "are not copyrighted. They are in the public domain"'
+  category_hint: [judgment, guidance]
+  notes: Decision flowcharts with worked examples for labeling, technology/engineering/performance and materials changes. FDA re-posted this PDF on 2026-02-06 (Last-Modified).
+- id: cfr-21-part-888-2025
+  title: 21 CFR Part 888, Orthopedic Devices
+  agency: Office of the Federal Register (govinfo), regulations of FDA
+  number: CFR annual edition, Title 21 volume 8, revised as of April 1, 2025
+  url: https://www.govinfo.gov/content/pkg/CFR-2025-title21-vol8/pdf/CFR-2025-title21-vol8-part888.pdf
+  fallback_url: null
+  collections: [public-domain, public-fda-ortho]
+  sha256: ea40d21340b7e3bce0523149e0fb0e0efaf37516e226379a992c280ed6317bd3
+  bytes: 271208
+  pages: 34
+  last_modified: Fri, 05 Sep 2025 16:08:05 GMT
+  fetched_utc: '2026-09-15T01:31:51Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; official CFR annual edition on govinfo'
+  category_hint: [standard, table]
+  notes: Classification regulations with class and special controls, for example 888.3070 (pedicle screw systems) and 888.3080 (IBFDs). The 2026 edition was not on govinfo as of 2026-09-14.
+- id: nasa-std-5001b-chg3
+  title: Structural Design and Test Factors of Safety for Spaceflight Hardware
+  agency: NASA
+  number: NASA-STD-5001B with Change 3; document date 2014-08-06; Change 3 approved 2022-10-24
+  url: https://standards.nasa.gov/sites/default/files/standards/NASA/B-w/CHANGE-3/3/2022-10-24-NASA-STD-5001B-w-Change-3-Approved.pdf
+  fallback_url: null
+  collections: [public-domain, public-nasa-standards]
+  sha256: f4d15692f1181ee1b9d47f3394bb2a7f79b707e98cdba6d5bf523e8e4cfb6bb5
+  bytes: 558597
+  pages: 36
+  last_modified: Mon, 24 Oct 2022 18:48:34 GMT
+  fetched_utc: '2026-09-15T01:31:51Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [N] NASA Technical Standards System landing page: "Internet Public -- Standard is cleared for public accessibility on the internet"'
+  category_hint: [table, formula, standard]
+  notes: Minimum design and test factors (yield, ultimate, proof) and service life factors. Good for "what factor of safety" lookups.
+- id: nasa-std-5019a-chg4
+  title: Fracture Control Requirements for Spaceflight Hardware
+  agency: NASA
+  number: NASA-STD-5019A with Change 4; document date 2016-02-01; PDF titled "Revalidated 2025-09-05"
+  url: https://standards.nasa.gov/sites/default/files/standards/NASA/w/CHANGE-4/4/NASA-STD-5019A-w-Change-4-Revalidated-2025-09-05.pdf
+  fallback_url: null
+  collections: [public-domain, public-nasa-standards]
+  sha256: f4c6a66868d02f2575b8b815a92825d2a4d29907feaf408bb93ba880a5f20fab
+  bytes: 1548491
+  pages: 120
+  last_modified: Wed, 24 Sep 2025 23:30:24 GMT
+  fetched_utc: '2026-09-15T01:31:52Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [N] NASA Technical Standards System landing page: "Internet Public -- Standard is cleared for public accessibility on the internet"'
+  category_hint: [standard, judgment]
+  notes: Fracture-critical classification, damage-tolerance and safe-life analysis, NDE flaw screening, fracture control of fasteners.
+- id: nasa-std-5020b
+  title: Requirements for Threaded Fastening Systems in Spaceflight Hardware
+  agency: NASA
+  number: NASA-STD-5020B; 2021-08-06; revalidated 2026-01-05
+  url: https://standards.nasa.gov/sites/default/files/standards/NASA/B/0/2021-08-06-nasa-std-5020b_final.pdf
+  fallback_url: https://standards.nasa.gov/system/files/tmp/NASA-STD-5020B%20Revalidated%201-5-2026.pdf
+  collections: [public-domain, public-nasa-standards]
+  sha256: 26e758e41bae4e71d9f0a72775af614d9e062c7f1467105003a032b1ab4c206c
+  bytes: 2268757
+  pages: 114
+  last_modified: Fri, 21 Jan 2022 01:12:10 GMT
+  fetched_utc: '2026-09-15T01:31:52Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [N] NASA Technical Standards System landing page: "Internet Public"; page footer "APPROVED FOR PUBLIC RELEASE - DISTRIBUTION IS UNLIMITED"'
+  category_hint: [formula, standard]
+  notes: Numbered equations for preload, joint separation, slip, thread shear and fatigue, with required factors. The fallback is the revalidated re-rendering on a tmp path; it is a different file, so a fallback fetch will not match the recorded hash and must be re-recorded deliberately.
+- id: nasa-std-6016c-chg1
+  title: Standard Materials and Processes Requirements for Spacecraft
+  agency: NASA
+  number: NASA-STD-6016C with Change 1; document date 2021-09-30; Change 1 PDF dated 2023-11-15
+  url: https://standards.nasa.gov/sites/default/files/standards/NASA/C-w/Change-1/1/2023-11-15-NASA-STD-6016C-w-Chg-1-Final_0.pdf
+  fallback_url: null
+  collections: [public-domain, public-nasa-standards]
+  sha256: f3e393e5ff10013949fc2c16933b985e5224a483ef6b8a456005c78d9b7e7668
+  bytes: 1648973
+  pages: 157
+  last_modified: Thu, 16 Nov 2023 19:04:22 GMT
+  fetched_utc: '2026-09-15T01:31:53Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [N] NASA Technical Standards System landing page: "Internet Public -- Standard is cleared for public accessibility on the internet"'
+  category_hint: [standard, judgment]
+  notes: M&P requirements; stress corrosion cracking, hydrogen embrittlement, corrosion, fatigue and fracture, material usage agreements.
+- id: nasa-std-7009b
+  title: Standard for Models and Simulations
+  agency: NASA
+  number: NASA-STD-7009B; 2024-03-05
+  url: https://standards.nasa.gov/sites/default/files/standards/NASA/B/1/NASA-STD-7009B-Final-3-5-2024.pdf
+  fallback_url: null
+  collections: [public-domain, public-nasa-standards]
+  sha256: 7b95a2065325dc3035c35ce110557d817555d3f22210ce5f6ce0bb2fb4ccd8b4
+  bytes: 1417365
+  pages: 88
+  last_modified: Wed, 06 Mar 2024 16:55:32 GMT
+  fetched_utc: '2026-09-15T01:31:53Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [N] NASA Technical Standards System landing page: "Internet Public -- Standard is cleared for public accessibility on the internet"'
+  category_hint: [standard, judgment]
+  notes: Requirements for assessing and reporting M&S credibility. Pairs with the two FDA computational-modeling guidances for comparison questions.
+- id: nasa-rp-1228-fastener-design-manual
+  title: Fastener Design Manual
+  agency: NASA Lewis (now Glenn) Research Center
+  number: NASA RP-1228, March 1990; R. T. Barrett
+  url: https://ntrs.nasa.gov/api/citations/19900009424/downloads/19900009424.pdf
+  fallback_url: null
+  collections: [public-domain, public-nasa-standards]
+  sha256: 7942e1937732b71a8a86b10b9c9454ea434220ffef7214cdb22696a5cc494602
+  bytes: 5345208
+  pages: 100
+  last_modified: Thu, 06 Aug 2020 20:07:21 GMT
+  fetched_utc: '2026-09-15T01:31:56Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [T] NTRS record "distribution": "PUBLIC", copyright determination GOV_PUBLIC_USE_PERMITTED'
+  category_hint: [formula, table]
+  notes: Material selection, platings, lubricants, corrosion, locking methods, thread types and classes, fatigue, derivation of torque formulas, loads on a fastener group. Likely a 1990 scan with an OCR text layer; check the text layer after ingestion.
+- id: doe-hdbk-1017-1-material-science-v1
+  title: 'DOE Fundamentals Handbook: Material Science, Volume 1 of 2'
+  agency: US Department of Energy
+  number: DOE-HDBK-1017/1-93, January 1993
+  url: https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1017-93_VOL1.pdf
+  fallback_url: null
+  collections: [public-domain, public-doe]
+  sha256: 65e627812b191020cfa34446b37b85b82e53e0f35f6dbb81d2e61baf1fa1999c
+  bytes: 1456347
+  pages: 102
+  last_modified: Thu, 30 Apr 2026 17:20:21 GMT
+  fetched_utc: '2026-09-15T01:31:57Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [A] cover: "Distribution Statement A. Approved for public release; distribution is unlimited."'
+  category_hint: [formula, table]
+  notes: Structure of metals, stress, strain, Young's modulus, stress-strain relation, working of metals, corrosion, hydrogen embrittlement. Listed as Status Archive on energy.gov; PDF re-posted 2026-04-30.
+- id: doe-hdbk-1017-2-material-science-v2
+  title: 'DOE Fundamentals Handbook: Material Science, Volume 2 of 2'
+  agency: US Department of Energy
+  number: DOE-HDBK-1017/2-93, January 1993
+  url: https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1017-93_VOL2.pdf
+  fallback_url: null
+  collections: [public-domain, public-doe]
+  sha256: 78ff5c57adf6c2b5c01dac01d9c42a5af51eeb7b8c236e899ac30475804648ff
+  bytes: 960709
+  pages: 112
+  last_modified: Thu, 30 Apr 2026 16:51:11 GMT
+  fetched_utc: '2026-09-15T01:31:58Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [A] cover: "Distribution Statement A. Approved for public release; distribution is unlimited."'
+  category_hint: [formula, judgment]
+  notes: Thermal stress and thermal shock, brittle fracture, properties considered in materials selection. Listed as Status Archive on energy.gov; PDF re-posted 2026-04-30.
+- id: mil-hdbk-5j
+  title: Metallic Materials and Elements for Aerospace Vehicle Structures
+  agency: US Department of Defense
+  number: MIL-HDBK-5J, 31 January 2003; canceled 24 March 2006 (superseded by MMPDS, which is not public)
+  url: https://archive.org/download/milhdbk-5-j/MILHDBK5J.pdf
+  fallback_url: null
+  collections: [public-domain, public-mil]
+  sha256: 7f2450863566ff46091d233bdfc8b44a546034a91ac08008386375963198222c
+  bytes: 69928300
+  pages: 1733
+  last_modified: Thu, 13 Aug 2020 22:31:07 GMT
+  fetched_utc: '2026-09-15T01:32:03Z'
+  fetched_from: url
+  public_basis: '[A] cover: "Distribution Statement A. Approved for public release; distribution is unlimited." (archive.org item description and cover text); [Q] ASSIST QuickSearch Dist Stmt A; DoD work, 17 U.S.C. 105'
+  category_hint: [table, formula]
+  notes: Mirror; archive.org item milhdbk-5-j, about 70 MB, roughly 1733 pages. Design mechanical and physical properties and joint allowables; the last public edition of the allowables engineers now take from MMPDS. The DoD work itself is a US Government work; the hosting is a third-party upload.
+- id: mil-std-882e-chg1
+  title: System Safety
+  agency: US Department of Defense
+  number: MIL-STD-882E with Change 1, 27 September 2023 (Revision E dated 11 May 2012); active
+  url: https://www.cto.mil/wp-content/uploads/2025/07/MIL-STD-882E-w_CHANGE-1.pdf
+  fallback_url: null
+  collections: [public-domain, public-mil]
+  sha256: 6c6d0ba964deaa563736c6f640ab0fe569ace34ddd582628e16635adfed18688
+  bytes: 1419702
+  pages: 106
+  last_modified: Thu, 24 Jul 2025 13:42:20 GMT
+  fetched_utc: '2026-09-15T01:32:03Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; [Q] ASSIST QuickSearch Dist Stmt A'
+  category_hint: [table, standard, judgment]
+  notes: Hazard severity categories, probability levels, the risk assessment matrix and hazard analysis tasks. A public stand-in for risk-matrix questions since ISO 14971 is paywalled.
+- id: faa-damage-tolerance-handbook-vol1
+  title: 'Damage Tolerance Assessment Handbook, Volume I: Introduction, Fracture Mechanics, Fatigue Crack Propagation'
+  agency: FAA (Volpe National Transportation Systems Center for the FAA Technical Center)
+  number: DOT/FAA/CT-93/69.I (DOT-VNTSC-FAA-93-13.I); October 1993 per DTIC (ROSA P lists 1999-02-01)
+  url: https://rosap.ntl.bts.gov/view/dot/8825/dot_8825_DS1.pdf
+  fallback_url: https://archive.org/download/DTIC_ADA274777/DTIC_ADA274777.pdf
+  collections: [public-domain, public-faa]
+  sha256: 86d8c63d9337a338f53c87480afb274e2a918312bb38a81e9f246cf4f22ad233
+  bytes: 5634312
+  pages: 164
+  last_modified: null
+  fetched_utc: '2026-09-15T01:32:04Z'
+  fetched_from: url
+  public_basis: '[G] 17 U.S.C. 105 US Government work; ROSA P is USDOT''s public-access repository; the mirror is a DTIC public holding [R] (DTIC''s public site carries only unclassified, unlimited reports)'
+  category_hint: [formula, judgment]
+  notes: Fracture mechanics fundamentals, fracture criteria and crack growth rules. rosap.ntl.bts.gov refuses HEAD requests (403) but serves GET. Likely a 1993 scan with an OCR text layer; the archive.org fallback is a different scan, so a fallback fetch will not match the recorded hash.

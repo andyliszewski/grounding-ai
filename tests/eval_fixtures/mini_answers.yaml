@@ -1,0 +1,68 @@
+# Answer-benchmark fixture for the in-repo mini corpus (Epic 25).
+#
+# Test-only. Drives the grounded-answer benchmark tests with a fake Claude
+# client; it is not a real question set. Gold answers restate text that is in
+# the synthetic mini corpus chunks, and page numbers are the chunks' PDF page
+# indices (expected.page), so the same file also runs through the Epic 16
+# retrieval harness, which skips the unanswerable item.
+#
+# page_offsets are synthetic: they pretend printed page 10 of the gamma notes
+# sits on PDF page 12, so the tests can exercise printed-to-PDF page mapping
+# for ungrounded citations (pdf_page = printed_page + offset).
+
+agent: mini
+version: 1
+
+page_offsets:
+  doc-gamma: 2
+  doc-beta: 0
+
+# The mini documents' names carry no edition. Declaring the gamma notes as a
+# 1st edition lets "(Gamma Notes, 1st ed., p. 10)" be checked; a cited edition
+# on beta (no declared edition) is unresolvable as edition_unknown.
+editions:
+  doc-gamma: 1
+
+items:
+  - id: ans-001
+    query: "According to Popper, what criterion separates a scientific theory from pseudoscience?"
+    expected:
+      doc_ids: ["doc-gamma"]
+      page: 12
+    answer:
+      category: guidance
+      gold: "Falsifiability: a theory is scientific only if it makes predictions that observation could, in principle, refute."
+      must_include: ["falsifiability"]
+    tags: ["philosophy"]
+
+  - id: ans-002
+    query: "How is a percentile bootstrap confidence interval for a sample mean constructed?"
+    expected:
+      doc_ids: ["doc-beta"]
+      page: [247, 249]
+    answer:
+      category: formula
+      gold: "Resample the observed data with replacement many times, compute the mean of each bootstrap replicate, and read the interval off the lower and upper percentiles of that bootstrap distribution."
+      must_include: ["resample with replacement", "percentiles of the bootstrap distribution"]
+    tags: ["statistics"]
+
+  - id: ans-003
+    query: "Why are lattice formulations useful in quantum field theory?"
+    expected:
+      doc_ids: ["doc-alpha"]
+      page: [5, 6]
+    answer:
+      category: judgment
+      gold: "They discretize spacetime, which lets numerical simulations probe non-perturbative regimes."
+    tags: ["physics"]
+
+  # Published elsewhere (250 MPa), but not in the mini corpus: scored for the
+  # grounded conditions only, never against the ungrounded one.
+  - id: ans-004
+    query: "What is the minimum yield strength of ASTM A36 structural steel?"
+    answer:
+      category: unanswerable
+      answerable: false
+      unanswerable_kind: not_in_corpus
+      gold: "Not in the mini corpus; the model should say it cannot support an answer."
+    tags: ["materials"]

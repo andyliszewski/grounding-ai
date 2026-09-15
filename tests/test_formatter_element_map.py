@@ -111,6 +111,25 @@ def test_pdftotext_fallback_page_numbers_are_none():
     assert _coverage_check(result.markdown, result.elements)
 
 
+def test_pdftotext_fast_path_propagates_text_element_page_numbers():
+    """Per-page TextElements (from the fast pdftotext path) must surface
+    their ``page_number`` through ``format_markdown_with_map`` so the
+    chunker can derive real page_start / page_end on the no-OCR path.
+    """
+    elements = [
+        TextElement(text="Page one para A.", page_number=1),
+        TextElement(text="Page one para B.", page_number=1),
+        TextElement(text="Para that lives on page two.", page_number=2),
+        TextElement(text="Para that lives on page three.", page_number=3),
+    ]
+    result = format_markdown_with_map(elements)
+    assert [e.page_number for e in result.elements] == [1, 1, 2, 3]
+    # Headings still aren't detectable from flat pdftotext output, so
+    # heading_stack stays empty — pages alone are the fast-path win.
+    assert all(e.heading_stack == () for e in result.elements)
+    assert _coverage_check(result.markdown, result.elements)
+
+
 # ---------------------------------------------------------------------------
 # Raw-Markdown / EPUB path (AC 6, 9)
 # ---------------------------------------------------------------------------

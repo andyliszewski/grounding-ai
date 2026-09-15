@@ -231,11 +231,16 @@ def _classify_element(
     ``None``. TextElement inputs never yield a page number.
     """
     if isinstance(element, TextElement):
+        # The fast pdftotext path populates ``page_number`` on TextElement;
+        # the EPUB ebooklib fallback and Markdown ingest leave it None.
+        # Either way, surface whatever the parser set so the chunker can
+        # derive accurate page_start / page_end on the no-OCR path.
+        page_number = element.page_number
         match = _HEADING_FIRST_LINE_RE.match(normalized_text)
         if match and match.group(0).strip() == normalized_text.strip():
             level = len(match.group(1))
-            return None, (level, match.group(2).strip())
-        return None, None
+            return page_number, (level, match.group(2).strip())
+        return page_number, None
 
     category = getattr(element, "category", None) or ""
     page_number = _unstructured_page_number(element)

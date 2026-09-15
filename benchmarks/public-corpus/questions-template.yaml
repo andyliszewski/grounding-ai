@@ -1,0 +1,171 @@
+# Epic 25 answer benchmark: PUBLIC question set for the implant-eng-public agent.
+# Corpus: benchmarks/public-corpus/ (25 US government documents; see README.md and
+# inventory.md). Everything here may be published; the doc_ids below are from the
+# 2026-09-14 build and are listed with their slugs in inventory.md.
+#
+# How to write an item:
+#   1. Write the question from your own knowledge, worded the way you would ask it at work.
+#      Do not use corpus search to pick questions; that biases the set toward what retrieval
+#      already finds. Note how you located the page afterwards.
+#   2. Find the answer in the PDF and record the PDF page index: the number in the viewer's
+#      page box, counting from the first page of the file. Not the printed page number.
+#   3. Use the doc_id from inventory.md (it is the first 8 characters of the corpus
+#      document hash, not of the PDF). Every document in this corpus has page metadata, so
+#      any of the 25 can back an answerable item.
+#
+# Checklist (from the 2026-09-14 methodology review):
+#   - Every cited document has a page_offsets entry below (0 if printed equals PDF page, or
+#     `section` for a section-paged work like MIL-HDBK-5J "3-98" or the DOE handbooks
+#     "MS-01 Page 12"). The offsets were measured at one or two sample pages; confirm the
+#     offset at the page you cite before relying on it. Avoid section-paged works for
+#     page-based questions.
+#   - Every document has a revisions entry (revision letter, year, or a guidance date such as
+#     "September 2023") and an identifiers entry (document number, or a list of them), so
+#     ungrounded citations that name them can be checked.
+#     None of these documents carries an edition number, so `editions:` is unused.
+#   - Numeric items: state the unit the gold uses; rel_tol 0.02 for table values, abs_tol 0
+#     for integers; one number per question.
+#   - Formula items: no numeric block; must_include the symbols, the form and its limits.
+#   - Judgment items: 2 to 3 concrete must_include points.
+#   - Unanswerable items: pick a kind (below) and record how you confirmed the answer is
+#     absent (dense search, BM25 and a text search).
+#   - Aim for at least 10 items Claude is unlikely to have memorized (specific clauses,
+#     guidance details, obscure tables: FDA performance-criteria values, NASA-STD-5020B
+#     equation numbers, MIL-STD-882E table cells, 21 CFR 888 section numbers).
+#   - Prefer answers of one to two sentences.
+#   - MIL-HDBK-5J is half the corpus by chunk count; do not let it be half the questions.
+#
+# Target 30 to 50 items:
+#   table 8-10 | formula 8-10 | standard 6-8 | guidance 4-6 | judgment 4-6 | unanswerable 4-6
+# No confidential details: no device geometry, no project specifics, no client names.
+
+agent: implant-eng-public
+version: 1
+
+# pdf_page = printed_page + offset, or `section` for a section-paged work. Measured values
+# from inventory.md (sample pages in parentheses there). Re-check before relying on one.
+page_offsets:
+  2407fde5: 3          # fda-spinal-system-510k-2004
+  28e33873: 3          # fda-ibfd-special-controls-2007
+  f8c4da7f: 2          # fda-nonspinal-bone-screws-perf-criteria-2024
+  eccf8c84: 2          # fda-spinal-plating-perf-criteria-2020
+  e7aa1015: 0          # fda-modified-metallic-surfaces-1994
+  60302bab: 3          # fda-reporting-computational-modeling-2016
+  6715aa83: 0          # fda-cms-credibility-2023
+  199cba9b: 5          # fda-iso-10993-1-use-2023
+  dff0cd46: 3          # fda-510k-program-substantial-equivalence-2014
+  fa8f8887: -7495      # fr-qmsr-final-rule-2024 (printed pages are Federal Register pages 7496 to 7525)
+  b5889d8d: 0          # fda-bench-performance-testing-2019
+  31fa320d: 3          # fda-mr-safety-testing-labeling-2023
+  d944819e: 1          # fda-510k-for-device-change-2017
+  0ce2b093: -761       # cfr-21-part-888-2025 (printed pages are CFR volume pages, 762 onward)
+  5afd132e: 0          # nasa-std-5001b-chg3 (footer "N of 36")
+  edf7995e: 0          # nasa-std-5019a-chg4 (footer "N of 120")
+  f327d38b: 0          # nasa-std-5020b (footer "N of 114")
+  70c700ff: 0          # nasa-std-6016c-chg1 (footer "N of 157")
+  # aa017943: TO MEASURE   nasa-std-7009b: no printed page number found in the text layer; measure in a viewer, then uncomment
+  987bcc1c: 4          # nasa-rp-1228-fastener-design-manual
+  775f74b8: section    # doe-hdbk-1017-1-material-science-v1 (module-paged, "MS-01 Page 12")
+  41ec5758: section    # doe-hdbk-1017-2-material-science-v2 (module-paged)
+  9f9fdea2: section    # mil-hdbk-5j (chapter-paged, "3-98")
+  c1afa9a7: 7          # mil-std-882e-chg1
+  9a46f5c3: section    # faa-damage-tolerance-handbook-vol1 (chapter-paged, "1-14")
+
+# Revision letter or year, for checking the revision an ungrounded citation names.
+revisions:
+  2407fde5: 2004       # fda-spinal-system-510k-2004
+  28e33873: 2007       # fda-ibfd-special-controls-2007
+  f8c4da7f: 2024       # fda-nonspinal-bone-screws-perf-criteria-2024 (first issued 2020)
+  eccf8c84: 2020       # fda-spinal-plating-perf-criteria-2020
+  e7aa1015: 1994       # fda-modified-metallic-surfaces-1994
+  60302bab: 2016       # fda-reporting-computational-modeling-2016
+  6715aa83: 2023       # fda-cms-credibility-2023
+  199cba9b: 2023       # fda-iso-10993-1-use-2023
+  dff0cd46: 2014       # fda-510k-program-substantial-equivalence-2014
+  fa8f8887: 2024       # fr-qmsr-final-rule-2024
+  b5889d8d: 2019       # fda-bench-performance-testing-2019
+  31fa320d: 2023       # fda-mr-safety-testing-labeling-2023
+  d944819e: 2017       # fda-510k-for-device-change-2017
+  0ce2b093: 2025       # cfr-21-part-888-2025 (annual edition revised as of April 1, 2025)
+  5afd132e: "B"        # nasa-std-5001b-chg3
+  edf7995e: "A"        # nasa-std-5019a-chg4
+  f327d38b: "B"        # nasa-std-5020b
+  70c700ff: "C"        # nasa-std-6016c-chg1
+  aa017943: "B"        # nasa-std-7009b
+  987bcc1c: 1990       # nasa-rp-1228-fastener-design-manual
+  775f74b8: 1993       # doe-hdbk-1017-1-material-science-v1
+  41ec5758: 1993       # doe-hdbk-1017-2-material-science-v2
+  9f9fdea2: "J"        # mil-hdbk-5j
+  c1afa9a7: "E"        # mil-std-882e-chg1 (with Change 1)
+  9a46f5c3: 1993       # faa-damage-tolerance-handbook-vol1
+
+# Document identifiers, for checking an identifier an ungrounded citation names. A citation
+# that names one of these only matches the document that carries it: one digit out is a
+# different document (FDA-2013-D-1531 is not FDA-2013-D-1530, 21 CFR 820 is not 21 CFR 888).
+# The recognized designation styles are in grounding/eval/answers/citations.py (_ID_SERIES
+# plus the CFR, FDA docket, Federal Register and DOT report patterns). A value may be a list
+# when a document is known by more than one designation. An FDA guidance keeps its docket
+# across revisions, so the docket is identity here and the issue date is the revision above.
+identifiers:
+  0ce2b093: "21 CFR Part 888"
+  5afd132e: "NASA-STD-5001B"
+  edf7995e: "NASA-STD-5019A"
+  f327d38b: "NASA-STD-5020B"
+  70c700ff: "NASA-STD-6016C"
+  aa017943: "NASA-STD-7009B"
+  987bcc1c: "NASA RP-1228"
+  775f74b8: "DOE-HDBK-1017/1-93"
+  41ec5758: "DOE-HDBK-1017/2-93"
+  9f9fdea2: "MIL-HDBK-5J"
+  c1afa9a7: "MIL-STD-882E"
+  2407fde5: "FDA-2020-D-0957"      # docket; Spinal System 510(k)s guidance (CDRH doc 636)
+  28e33873: "2006D-0020"           # docket; IBFD special controls guidance
+  f8c4da7f: "FDA-2019-D-1652"
+  eccf8c84: "FDA-2019-D-1647"
+  e7aa1015: "FDA-2020-D-0957"      # docket shared with the spinal guidance
+  60302bab: "FDA-2013-D-1530"
+  6715aa83: "FDA-2021-D-0980"
+  199cba9b: "FDA-2013-D-0350"
+  dff0cd46: "FDA-2011-D-0652"      # CDRH doc 1766
+  fa8f8887: ["89 FR 7496 to 7525", "FDA-2021-N-0507"]   # the rule spans those FR pages
+  b5889d8d: "FDA-2018-D-1329"
+  31fa320d: "FDA-2019-D-2837"
+  d944819e: "FDA-2011-D-0453"
+  9a46f5c3: "DOT/FAA/CT-93/69.I"
+
+items:
+  # FORMAT EXAMPLE ONLY. It shows every field and fails validation on purpose (page 0);
+  # delete it before the first run.
+  - id: example-delete-me
+    query: "<the question, worded the way you would ask it at work>"
+    expected:
+      doc_ids: ["<doc_id from inventory.md>"]
+      page: 0                  # PDF page index, or [start, end]
+      section: "<optional: section or table label>"
+    tags: ["table"]
+    answer:
+      category: table          # table | formula | standard | guidance | judgment | unanswerable
+      gold: "<short gold answer, in your words>"
+      numeric:                 # delete this block if the answer is not a number
+        value: 0
+        unit: "<unit>"
+        rel_tol: 0.02          # or abs_tol, not both
+      must_include: []         # optional: key facts a correct answer must state
+      answerable: true
+
+  # An unanswerable item. Two kinds:
+  #   no_source: no reliable source answers it as asked (false premise, missing information,
+  #              unpublished data); scored in every condition.
+  #   not_in_corpus: published elsewhere but absent from this library (for example a value
+  #              that lives in MMPDS, an ASTM standard or ISO 14971); scored for grounded
+  #              conditions only.
+  # - id: pub-0xx
+  #   query: "<question>"
+  #   expected:
+  #     doc_ids: []
+  #   tags: ["unanswerable"]
+  #   answer:
+  #     category: unanswerable
+  #     gold: "<why it cannot be answered>"
+  #     answerable: false
+  #     unanswerable_kind: no_source

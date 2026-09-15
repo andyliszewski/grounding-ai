@@ -24,6 +24,12 @@ Thanks for your interest in contributing! This project is maintained by a solo d
 4. Run the test suite and confirm it passes
 5. Submit a pull request
 
+`main` is protected: direct pushes are rejected for everyone, so a PR is the only way
+to land a change. The `test` job from `.github/workflows/ci.yml` is a required check,
+and branches must be up to date with `main` before they can merge, so if `main` moves
+while your PR is open you will need to update the branch. CI runs on pull requests
+only, not on pushes to `main`.
+
 ## Code Style
 
 - Follow existing patterns in the codebase

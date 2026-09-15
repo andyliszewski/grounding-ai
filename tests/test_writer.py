@@ -75,6 +75,41 @@ def test_write_document_missing_output_path_raises(tmp_path: Path) -> None:
         write_document(context, "Content", [])
 
 
+def test_write_document_clears_stale_chunks_on_reingest(tmp_path: Path) -> None:
+    """Story 23.1: a revision producing fewer chunks leaves no stale ch_*.md."""
+    context = make_context(tmp_path, slug="revised")
+    md = "# Doc\n"
+
+    first = [f"---\nchunk: {i}\n---\n\nBody {i}\n" for i in range(1, 6)]  # 5 chunks
+    write_document(context, md, first)
+    chunk_dir = context.output_path.parent / "chunks"
+    assert [f.name for f in sorted(chunk_dir.glob("ch_*.md"))] == [
+        f"ch_{i:04d}.md" for i in range(1, 6)
+    ]
+
+    # Re-ingest a revised version with only 2 chunks.
+    second = [f"---\nchunk: {i}\n---\n\nNew body {i}\n" for i in range(1, 3)]
+    write_document(context, md, second)
+
+    remaining = [f.name for f in sorted(chunk_dir.glob("ch_*.md"))]
+    assert remaining == ["ch_0001.md", "ch_0002.md"]  # ch_0003..0005 are gone
+    assert "New body 1" in (chunk_dir / "ch_0001.md").read_text(encoding="utf-8")
+
+
+def test_write_document_cleanup_leaves_sibling_files_untouched(tmp_path: Path) -> None:
+    """Story 23.1: cleanup is scoped to ch_*.md, not other artifacts."""
+    context = make_context(tmp_path, slug="withsiblings")
+    write_document(context, "# Doc\n", ["---\nchunk: 1\n---\n\nBody\n"])
+    chunk_dir = context.output_path.parent / "chunks"
+    # Drop a non-chunk file beside the chunks (e.g. a stray index).
+    (chunk_dir / "notes.txt").write_text("keep me", encoding="utf-8")
+
+    write_document(context, "# Doc\n", ["---\nchunk: 1\n---\n\nBody v2\n"])
+
+    assert (chunk_dir / "notes.txt").read_text(encoding="utf-8") == "keep me"
+    assert (chunk_dir / "ch_0001.md").exists()
+
+
 def test_write_document_overwrites_existing_file(tmp_path: Path) -> None:
     context = make_context(tmp_path)
     doc_path = context.output_path

@@ -1,8 +1,19 @@
 name: ci
 
+# PR-only. The push-to-main trigger was removed deliberately: `main` now carries
+# branch protection with `strict: true` (a branch must be up to date with main before
+# it can merge) and `enforce_admins: true` (nobody, including the owner, can push
+# directly), so the only tree that can reach main is one the required `test` check
+# already passed on. The push-triggered run was re-testing that identical tree a
+# second time: 21 of the 55 jobs run between 2026-04-14 and 2026-07-30 (~38%) were
+# that duplicate. `workflow_dispatch` stays as the manual escape hatch for running ci
+# against main on demand.
+#
+# `test` is the only required check. `eval` is deliberately NOT required, because
+# eval.yml is path-filtered: a required check whose workflow gets skipped by a path
+# filter stays "Pending" forever and the PR can never merge. GitHub's own guidance is
+# not to use path filtering on workflows that are required to pass before merging.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -34,7 +45,10 @@ jobs:
 
       - name: Install grounding-ai and test deps
         run: |
-          pip install -e .
+          # CPU-only PyTorch: CI has no GPU, and the default CUDA build (over 2 GB of
+          # NVIDIA wheels) has exceeded both the job timeout and the runner's disk.
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[mcp]"
           pip install pytest
 
       - name: Cache mini FAISS index

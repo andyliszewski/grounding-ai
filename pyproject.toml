@@ -56,7 +56,20 @@ dependencies = [
 # floor keeps a known-vulnerable build out of dev installs. Mirrors the
 # floor pinned in the MCP server Dockerfile.
 mcp = [
-    "mcp>=1.0.0",
+    "mcp>=1.0.0,<2",  # the server uses the 1.x low-level Server API (list_tools/call_tool)
+    "starlette>=1.0.1",
+]
+# Grounded-answer benchmark (`grounding eval-answers`, Epic 25). Optional:
+# the ingestion pipeline and `grounding eval` never need it, and a
+# `--dry-run` works without it. The benchmark calls the Claude API through
+# the anthropic SDK and calls the corpus-search MCP server's search_corpus
+# in-process, so it also needs mcp (same starlette floor as the mcp extra).
+# The report's bar chart uses matplotlib, which is not listed here because
+# it already arrives with music21, a core dependency.
+# Install with `pip install -e '.[bench]'`.
+bench = [
+    "anthropic>=1.5",
+    "mcp>=1.0.0,<2",  # the server uses the 1.x low-level Server API (list_tools/call_tool)
     "starlette>=1.0.1",
 ]
 

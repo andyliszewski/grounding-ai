@@ -111,9 +111,21 @@ class ManifestManager:
 
     @staticmethod
     def register_document(manifest: ManifestData, entry: ManifestEntry) -> ManifestData:
-        docs_by_id: Dict[str, ManifestEntry] = {doc.doc_id: doc for doc in manifest.docs}
-        docs_by_id[entry.doc_id] = entry
-        sorted_docs = sorted(docs_by_id.values(), key=lambda doc: (doc.slug, doc.doc_id))
+        # One corpus directory per slug, so the manifest holds at most one entry
+        # per slug (and per doc_id). A new entry supersedes any prior entry that
+        # shares its slug — an in-place revision whose changed content minted a
+        # new doc_id — as well as any prior entry that shares its doc_id. This
+        # guarantees two entries can never share a slug / doc_path (Story 23.2).
+        # Genuine slug collisions between *different* source documents are
+        # rejected upstream in the controller before registration, so a same-slug
+        # supersede here is always the same logical document being updated.
+        retained = [
+            doc
+            for doc in manifest.docs
+            if doc.slug != entry.slug and doc.doc_id != entry.doc_id
+        ]
+        retained.append(entry)
+        sorted_docs = sorted(retained, key=lambda doc: (doc.slug, doc.doc_id))
         manifest.docs = sorted_docs
         manifest.updated_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         return manifest

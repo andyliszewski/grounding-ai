@@ -1,0 +1,27 @@
+# Template unit for the Grounding staging watcher.
+# Copy to ~/.config/systemd/user/grounding-watcher.service, replace the
+# <PLACEHOLDER> paths with absolute paths for your host, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now grounding-watcher
+# The live unit on the ingestion server lives in ~/.config/systemd/user/ (untracked).
+# <AGENTS_DIR> points at your (private) agent-definitions checkout.
+[Unit]
+Description=Grounding Staging Watcher
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=<REPO_DIR>/scripts/staging-watcher.sh
+Restart=always
+RestartSec=10
+Environment=PATH=<REPO_DIR>/venv/bin:/usr/bin:/bin
+Environment=STAGING_DIR=<STAGING_DIR>
+Environment=CORPUS_DIR=<DATA_DIR>/corpus
+Environment=ORIGINALS_DIR=<DATA_DIR>/originals
+Environment=SKIPPED_DIR=<DATA_DIR>/skipped
+Environment=LOG_FILE=<LOG_DIR>/grounding-watcher.log
+Environment=AUTO_EMBEDDINGS=true
+Environment=AGENTS_DIR=<AGENTS_DIR>
+Environment=EMBEDDINGS_DIR=<DATA_DIR>/embeddings
+
+[Install]
+WantedBy=default.target

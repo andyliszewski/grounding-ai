@@ -239,7 +239,7 @@ class TestAgenticIntegration:
 
         assert config.max_iterations == 10
         assert config.verbose is True
-        assert config.timeout == 120  # default
+        assert config.timeout == 600  # default
 
     def test_tool_registry_creation(self):
         """ToolRegistry can be created and tools registered."""

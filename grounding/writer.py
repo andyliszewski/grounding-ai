@@ -50,6 +50,25 @@ def write_document(
     ensure_dir(doc_path.parent)
     ensure_dir(chunk_dir)
 
+    # Story 23.1: clear chunk files from any prior version of THIS document
+    # before writing the new set. A revision that produces fewer chunks than the
+    # previous version would otherwise leave orphaned ch_*.md behind, which the
+    # embedder's directory glob (cli.py) would pick up and embed as stale content
+    # citing pages/sections that no longer exist. Upstream slug-collision
+    # detection (Story 23.2, controller.py) guarantees this chunk dir belongs to
+    # the same document being written, so this only ever removes our own stale
+    # chunks. Scoped to ch_*.md — doc.md, meta.yaml, music/ and formulas/ outputs
+    # are untouched.
+    stale_chunks = sorted(chunk_dir.glob("ch_*.md"))
+    for stale in stale_chunks:
+        stale.unlink()
+    if stale_chunks:
+        logger.debug(
+            "Removed %d stale chunk file(s) before re-write slug=%s",
+            len(stale_chunks),
+            context.slug,
+        )
+
     atomic_write(doc_path, markdown)
 
     for index, chunk in enumerate(chunks, start=1):

@@ -39,9 +39,19 @@ class ParseError(Exception):
 
 @dataclass
 class TextElement:
-    """Simple text element for pdftotext output."""
+    """Simple text element used by the fast pdftotext path and EPUB fallback.
+
+    ``page_number`` is populated by the pdftotext path (one element per
+    paragraph, page derived from the PDF's form-feed boundaries) and left
+    ``None`` by paths without page semantics (EPUB ebooklib fallback,
+    Markdown ingest). The formatter reads this field directly when
+    building its element map, so chunks can carry real ``page_start`` /
+    ``page_end`` provenance even on the no-OCR fast path. See Story
+    17.2 for the chunker side of the contract.
+    """
     text: str
     metadata: dict = None
+    page_number: Optional[int] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -147,6 +157,31 @@ def _has_sufficient_text(text: str, file_size_mb: float) -> bool:
     return chars_per_mb >= MIN_TEXT_YIELD_PER_MB
 
 
+def _split_pdftotext_into_page_elements(text: str) -> List["TextElement"]:
+    """Turn raw pdftotext output into per-page, per-paragraph TextElements.
+
+    ``pdftotext -layout`` emits a U+000C (form-feed, ``\\f``) at every page
+    boundary plus one leading and one trailing form-feed: i.e. the layout is
+    ``\\f<page 1>\\f<page 2>\\f...\\f<page N>\\f``. Splitting on form-feeds
+    after stripping leading ones yields one entry per page, in order, with
+    ``enumerate(..., start=1)`` giving the natural PDF page number. We then
+    split each page's text on blank lines for paragraph granularity (matching
+    the legacy fast-path's chunking unit) and propagate the page number into
+    each element so the formatter / chunker pipeline can derive ``page_start``
+    and ``page_end`` per chunk. PDFs without any form-feed (rare; non-layout
+    pdftotext modes or one-page PDFs) gracefully degrade to a single page.
+    """
+    text = text.lstrip("\f")
+    pages = text.split("\f")
+    elements: List["TextElement"] = []
+    for page_num, page_text in enumerate(pages, start=1):
+        for paragraph in page_text.split("\n\n"):
+            stripped = paragraph.strip()
+            if stripped:
+                elements.append(TextElement(text=stripped, page_number=page_num))
+    return elements
+
+
 def parse_pdf(file_path: Path, ocr_mode: str = "auto") -> List[Any]:
     """
     Parse a PDF into structured elements.
@@ -193,9 +228,14 @@ def parse_pdf(file_path: Path, ocr_mode: str = "auto") -> List[Any]:
 
         if _has_sufficient_text(text, file_size_mb):
             elapsed_ms = (time.perf_counter() - start) * 1000
-            # Split into paragraphs for better chunking
-            paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-            elements = [TextElement(text=p) for p in paragraphs]
+            # Split per page first (pdftotext -layout emits \f form-feed at
+            # page boundaries, plus a leading and trailing one) so each
+            # paragraph carries its source page_number. Without this the
+            # chunker has no element-level page info on the fast path and
+            # every chunk lands with page_start=null. Section headings still
+            # require structural metadata we don't have here, but pages
+            # alone are enough to drive [slug, p.N] citations.
+            elements = _split_pdftotext_into_page_elements(text)
             logger.info(
                 "Fast extraction succeeded: %s (%d elements, %d chars) elapsed_ms=%.2f",
                 file_path.name,

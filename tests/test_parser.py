@@ -144,3 +144,90 @@ def test_parse_pdf_wraps_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert exc.value.file_path == pdf_file
     assert "broken.pdf" in str(exc.value)
     assert exc.value.__cause__ is not None
+
+
+# ---------------------------------------------------------------------------
+# Fast-path page preservation (pdftotext form-feed boundaries → page_number)
+# ---------------------------------------------------------------------------
+
+TextElement = parser_module.TextElement
+_split_pdftotext_into_page_elements = parser_module._split_pdftotext_into_page_elements
+
+
+def test_split_pdftotext_assigns_sequential_page_numbers() -> None:
+    # Layout pdftotext actually produces: leading \f, page text, \f, ..., trailing \f
+    raw = "\f Page one paragraph.\n\nPage one second paragraph.\n\f Page two only.\n\f Page three.\n\f"
+    elements = _split_pdftotext_into_page_elements(raw)
+
+    assert [(e.page_number, e.text) for e in elements] == [
+        (1, "Page one paragraph."),
+        (1, "Page one second paragraph."),
+        (2, "Page two only."),
+        (3, "Page three."),
+    ]
+
+
+def test_split_pdftotext_skips_blank_pages_without_renumbering() -> None:
+    # A blank page in the source should not consume a page-number slot for
+    # subsequent pages — the page index stays aligned to the PDF's own
+    # numbering.
+    raw = "\fFirst.\n\f\n\fThird.\n\f"
+    elements = _split_pdftotext_into_page_elements(raw)
+    assert [(e.page_number, e.text) for e in elements] == [
+        (1, "First."),
+        (3, "Third."),
+    ]
+
+
+def test_split_pdftotext_handles_text_without_formfeeds() -> None:
+    # Single-page PDFs (or non-layout pdftotext output) produce no \f.
+    raw = "Just one page of text.\n\nAnother paragraph."
+    elements = _split_pdftotext_into_page_elements(raw)
+    assert [(e.page_number, e.text) for e in elements] == [
+        (1, "Just one page of text."),
+        (1, "Another paragraph."),
+    ]
+
+
+def test_text_element_defaults_page_number_to_none() -> None:
+    # Backward compat: existing call sites that don't pass page_number
+    # (EPUB fallback, Markdown ingest, existing tests) must keep working.
+    elem = TextElement(text="hello")
+    assert elem.page_number is None
+    assert elem.metadata == {}
+
+
+def test_parse_pdf_fast_path_emits_per_page_elements(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End-to-end: fast pdftotext path → TextElements carrying page numbers."""
+    pdf_file = tmp_path / "sample.pdf"
+    pdf_file.write_bytes(b"%PDF-1.4 fake-bytes-for-size")
+
+    fake_pdftotext_out = (
+        "\f"
+        "Title of paper.\n\nIntro paragraph one.\n\nIntro paragraph two.\n"
+        "\f"
+        "Section header on page 2.\n\nMore content.\n"
+        "\f"
+    )
+
+    def fake_extract(_path: Path) -> str:
+        return fake_pdftotext_out
+
+    def fake_sufficient(_text: str, _mb: float) -> bool:
+        return True
+
+    monkeypatch.setattr(parser_module, "_extract_with_pdftotext", fake_extract)
+    monkeypatch.setattr(parser_module, "_has_sufficient_text", fake_sufficient)
+
+    elements = parse_pdf(pdf_file, ocr_mode="off")
+
+    assert all(isinstance(e, TextElement) for e in elements)
+    assert [(e.page_number, e.text) for e in elements] == [
+        (1, "Title of paper."),
+        (1, "Intro paragraph one."),
+        (1, "Intro paragraph two."),
+        (2, "Section header on page 2."),
+        (2, "More content."),
+    ]

@@ -408,7 +408,7 @@ class TestDataclasses:
 
         assert config.max_iterations == 5
         assert config.verbose is False
-        assert config.timeout == 120
+        assert config.timeout == 600
 
     def test_tool_call_creation(self):
         """ToolCall can be created with name and arguments."""

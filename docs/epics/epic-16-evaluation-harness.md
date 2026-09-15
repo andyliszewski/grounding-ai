@@ -4,7 +4,7 @@
 **Owner:** Andy
 **Status:** Draft
 **Priority:** P1
-**Completed Stories:** 0/4
+**Completed Stories:** 0/5
 **Dependencies:** Epic 6 (Vector Embeddings), Epic 10 (Centralized Corpus)
 **Target Completion:** TBD
 
@@ -144,6 +144,20 @@ items:
 - Initial baseline committed and dated.
 - README explains: how to add fixtures, how to run locally, how to refresh the baseline, how the CI gate works.
 - A deliberate regression PR (e.g., chunk size 100) is shown to fail the gate as a sanity check.
+
+**Status:** Draft
+
+### Story 16.5: Agentic-Loop Discipline Reproducer Suite
+
+Extends Epic 16's measurement scope from retrieval scoring to agentic-mode runtime behavior. Independent of Stories 16.1–16.4 (different surface, different metrics) — a one-off research script under `scripts/eval/`, not an extension of `grounding/eval/`. Produces data + a written recommendation; does **not** ship any prompt, MCP, or loop change. Motivated by an N=1 observation of `qwen3.6:27b` looping on a known-retrievable Clean-Code query against the `coder` agent. Applies the same measure-before-ship discipline as Stories 18.4 and 19.4.
+
+- Run a 3-model × 2-agent × 8-query matrix (48 cells, ~1–2 hours of compute).
+- Models: `qwen3.6:27b` (failing), `qwen2.5:32b` (baseline), one out-of-family control (`gemma3:27b` or llama4-mid).
+- Agents: `coder` + one of {`scientist`, `philosopher`}.
+- Measure: iterations-to-answer, redundant retrievals, expected-chunk-surfaced rate, manually-graded correctness.
+- Output: JSONL traces + summary report committing to one of four recommendations: no fix / per-agent style nudge / cross-cutting MCP nudge / mechanical guardrail.
+
+**AC:** see full story file at `docs/stories/16.5-agentic-loop-discipline-reproducer.md`.
 
 **Status:** Draft
 

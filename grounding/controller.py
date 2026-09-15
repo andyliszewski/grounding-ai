@@ -290,11 +290,17 @@ def run_controller(
 
     chunk_size = config.metadata.get("chunk_size", 1_200)
     chunk_overlap = config.metadata.get("chunk_overlap", 150)
-    chunk_config = ChunkConfig(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    min_chunk_size = config.metadata.get("min_chunk_size")
+    chunk_config = ChunkConfig(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        min_chunk_size=min_chunk_size,
+    )
 
     params_for_meta = dict(config.metadata)
     params_for_meta.setdefault("chunk_size", chunk_size)
     params_for_meta.setdefault("chunk_overlap", chunk_overlap)
+    params_for_meta.setdefault("min_chunk_size", min_chunk_size)
     params_for_meta.setdefault("parser", config.parser)
     params_for_meta.setdefault("ocr_mode", config.ocr_mode)
 
@@ -317,6 +323,33 @@ def run_controller(
             continue
         if not context.markdown:
             active_logger.warning("No Markdown captured for slug=%s; skipping", context.slug)
+            continue
+
+        # Story 23.2: slug-collision guard. The corpus is one directory per slug,
+        # so if this slug already belongs to a DIFFERENT source document (a
+        # different orig_name), writing here would silently overwrite that
+        # document's doc.md / chunks and leave two manifest entries on one
+        # doc_path. Fail this file instead; the maintainer renames the source.
+        # A same-orig_name match is a re-ingest of the same document and proceeds
+        # (its stale chunks are cleared at write time, Story 23.1). The check sees
+        # earlier same-batch docs because register_document mutates manifest_data
+        # in place, so it covers both cross-run and same-batch collisions.
+        existing_entry = next(
+            (doc for doc in manifest_data.docs if doc.slug == context.slug), None
+        )
+        if (
+            existing_entry is not None
+            and existing_entry.orig_name != context.source_path.name
+        ):
+            handle_failure(
+                "slug_collision",
+                context,
+                ValueError(
+                    f"slug '{context.slug}' already maps to "
+                    f"'{existing_entry.orig_name}'; '{context.source_path.name}' "
+                    f"would overwrite it — rename the source file"
+                ),
+            )
             continue
 
         # Extract formulas if enabled

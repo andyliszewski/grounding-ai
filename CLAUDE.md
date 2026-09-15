@@ -126,6 +126,51 @@ pytest --cov=grounding
 python -m grounding.cli --help  # Verify CLI works
 ```
 
+## CI and Branch Protection
+
+**`main` is protected. You cannot push to it directly, and neither can the owner.**
+Every change goes through a PR. Attempting `git push origin main` fails, including
+with `--force`.
+
+Protection settings on `andyliszewski/grounding-ai-private`:
+
+| Setting | Value | Consequence |
+|---------|-------|-------------|
+| `required_status_checks.contexts` | `["test"]` | The `test` job in `ci.yml` must pass |
+| `required_status_checks.strict` | `true` | A branch must be up to date with `main` before it can merge; if `main` moves, update the branch |
+| `enforce_admins` | `true` | No direct pushes by anyone, owner included |
+| `allow_force_pushes` / `allow_deletions` | `false` | `main` cannot be force-pushed or deleted |
+
+### Workflows
+
+| Workflow | Triggers | Runner | Required check? |
+|----------|----------|--------|-----------------|
+| `ci.yml` (job `test`) | `pull_request`, `workflow_dispatch` | `ubuntu-latest` | **Yes** (`test`) |
+| `eval.yml` (job `eval`) | `pull_request` filtered to retrieval paths | `ubuntu-latest` | **No**, deliberately |
+
+**Why `ci.yml` has no `push: branches: [main]` trigger.** It used to, which meant
+every merged PR ran `ci` twice on an identical tree: once on the PR, once on the merge
+commit. 21 of the 55 jobs run between 2026-04-14 and 2026-07-30 (~38%) were that
+duplicate. `strict: true` + `enforce_admins: true` mean the only tree that can reach
+`main` is one `test` already passed on, so the push run is redundant rather than merely
+wasteful. `workflow_dispatch` is the manual escape hatch for running `ci` against
+`main` on demand.
+
+**Why `eval` is NOT a required check.** `eval.yml` is path-filtered. A required check
+whose workflow gets skipped by a path filter stays "Pending" forever and the PR can
+never merge; GitHub's own guidance is not to use path or branch filtering on workflows
+that are required to pass before merging. If you ever add a required check, gate it
+with a job-level `if:` (a skipped job reports Success) rather than a workflow-level
+`paths:` filter.
+
+### Runners stay GitHub-hosted, on Linux
+
+Do not move these jobs to a self-hosted macOS runner. Both jobs are Linux-only and
+cheap (~163 billable min/month across both workflows, measured from the Actions jobs
+API over 2026-04-14 to 2026-07-30), and self-hosting would break `sudo apt-get install
+-y poppler-utils`, churn the `runner.os`-keyed caches, and stop validating the platform
+the repo's `Dockerfile` and `deploy/` actually target.
+
 ## Architecture
 
 ### High-Level Design
@@ -518,6 +563,23 @@ journalctl --user -u grounding-watcher -f  # Follow logs
    - Failed/scanned → source moved to `skipped/<collection>/`
    - Output in `corpus/<slug>/` with doc.md, meta.yaml, chunks/
 
+**Startup ordering and reconciliation (Epic 24, Story 24.6):** the live
+`inotifywait -m` monitor starts **before** the one-shot startup scan
+(`process_existing`), not after it. On a large corpus the startup scan runs
+50+ minutes (OCR backlog + per-agent embedding rebuilds); running it inside the
+first loop iteration with the monitor already live means events that fire during
+the scan are buffered in the pipe + kernel inotify queue and drained the instant
+the scan returns. A one-time `sleep 2` lets recursive watches establish before
+the scan snapshots `staging/*/`, so pre-watch arrivals are caught by the scan and
+during-scan arrivals by inotify — the union has no hole. Previously the monitor
+started only after the scan finished, leaving a ~50-min blind window in which
+Syncthing-delivered files were seen by neither mechanism and silently dropped
+(no log line, no error) until manually re-triggered. As defense in depth, the
+`PENDING_RETRY_INTERVAL` idle tick also runs a **reconciliation rescan**
+(`reconcile_staging`) that re-processes any collection with staged-but-uningested
+files, guaranteeing eventual pickup (bounded by `PENDING_RETRY_INTERVAL`) even if
+an event is ever lost to an inotify queue overflow.
+
 ### Environment Variables
 
 Set in systemd service:
@@ -537,9 +599,36 @@ Environment=EMBEDDINGS_DIR=/path/to/data/embeddings
 | `AUTO_EMBEDDINGS` | `false` | Enable automatic embedding updates after ingestion |
 | `AGENTS_DIR` | (none) | Path to agent YAML definitions for collection matching |
 | `EMBEDDINGS_DIR` | (none) | Path to embeddings output directory |
-| `LOCK_TIMEOUT` | `3600` | Seconds before stale embedding lock is auto-removed |
+| `LOCK_TIMEOUT` | `3600` | **Deprecated/no-op** since Epic 24.1 (flock lock is kernel-released on death); retained for backward-compat |
 | `REPO_DIR` | (derived) | Git repo path; if unset, derives from AGENTS_DIR parent |
 | `GIT_PULL_ENABLED` | `true` | Pull latest git changes before processing documents |
+| `MAX_EMBED_ATTEMPTS` | `3` | Epic 24.4: failures before a pending agent's embedding update is given up on (loud log + `.failed` marker) |
+| `PENDING_RETRY_INTERVAL` | `300` | Epic 24.4/24.6: seconds of inotify inactivity after which pending embedding updates are retried **and** staging is reconciled for any un-ingested files (periodic tick) |
+| `MAX_OCR_ATTEMPTS` | `3` | Epic 24.5: OCR "no output" misses before a scanned PDF is quarantined to `skipped/<collection>/quarantine/` |
+
+### Agent-Config Propagation (Cross-Repo)
+
+Agent YAML files (`qms.yaml`, `ceo.yaml`, etc.) live in a **separate git
+repository** from this one — on the maintainer's setup,
+`github.com/andyliszewski/my-agents`, cloned to `AGENTS_DIR`'s parent. The
+watcher treats that repo as the authoritative source of agent
+configuration: `pull_latest_repo()` runs `git pull --ff-only` against
+`REPO_DIR` (derived from `AGENTS_DIR`) both at `process_existing()`
+startup and inside the inotifywait loop **before every ingestion batch**.
+
+Practical consequence: an agent YAML change (e.g., adding a collection
+to `corpus_filter.collections`) takes effect on Ubuntu only after the
+change is committed and pushed to the agents repo. Editing the agent
+YAML on a workstation without pushing leaves Ubuntu using the old
+config, and the next ingestion — along with any `AUTO_EMBEDDINGS`
+regeneration it triggers — will honor the pre-push state. The
+workstation's corpus / embeddings directories are typically
+`receiveonly` under Syncthing (Ubuntu authoritative), so the
+workstation cannot make this effective by writing locally either.
+
+To propagate an agent YAML change end-to-end: commit + push in the
+agents repo, then either drop a new doc in `staging/` to trigger the
+watcher (which will pull first), or restart the watcher service.
 
 ### Scanned PDF Detection
 
@@ -547,6 +636,18 @@ The watcher uses a quick pdftotext check to detect scanned PDFs:
 - Threshold: 1000 chars per MB (`MIN_TEXT_YIELD_PER_MB`)
 - Below threshold → treated as scanned, moved to skipped/
 - Above threshold → text-extractable, processed with `--ocr off`
+
+**OCR poison-pill quarantine (Epic 24, Story 24.5):** scanned PDFs in
+`skipped/<collection>/` are re-OCR'd each cycle until they succeed. A PDF whose
+OCR repeatedly "completes but produces no output" would otherwise be re-OCR'd
+(minutes each) forever, taxing the serial loop. Each such miss is counted in a
+hidden `skipped/<collection>/.ocr-attempts/` dir; after `MAX_OCR_ATTEMPTS` misses
+the file is moved to `skipped/<collection>/quarantine/` (a loud `ERROR` log) and
+is no longer re-OCR'd — both the counter dir and the quarantine subdir sit
+outside the backlog's `*.pdf` glob. Inspect and move a file back out of
+`quarantine/` to retry it. Batch-level OCR failures (the OCR tool erroring on the
+whole collection) are treated as transient and are **not** counted, so they keep
+retrying.
 
 ## Embedding Generation
 
@@ -583,11 +684,38 @@ When `AUTO_EMBEDDINGS=true`, the watcher automatically updates agent embeddings 
 - Matches document collection against agent's `corpus_filter.collections` list
 - Only agents with matching collections receive embedding updates
 
-**Lock file behavior:**
-- Lock file created at `$EMBEDDINGS_DIR/_embeddings.lock` before updates
-- Contains PID of the process holding the lock
-- Stale locks (older than `LOCK_TIMEOUT`) are automatically removed
-- If lock is held, embedding update is skipped (logged, not an error)
+**Lock file behavior (`flock`-based since Epic 24, Story 24.1):**
+- Mutual exclusion uses `flock` (util-linux) on a held file descriptor opened
+  against `$EMBEDDINGS_DIR/_embeddings.lock`. Acquisition is atomic (no
+  check-then-write TOCTOU).
+- The lock is held for exactly as long as the holding process keeps that
+  descriptor open. The **kernel releases it automatically when the process
+  dies** (crash, OOM, `kill -9`, `systemctl restart`), so a killed watcher
+  never strands the lock — the next invocation acquires immediately. There is
+  no age-based staleness check and no PID parsing.
+- A legitimately long embedding run can never have its lock stolen by a second
+  invocation, regardless of how long it runs.
+- Acquisition is non-blocking (`flock -n`): if the lock is held, the embedding
+  update is skipped and logged (not an error). The lock file itself is a
+  persistent rendezvous point and is intentionally never removed.
+- `LOCK_TIMEOUT` is **deprecated and a no-op** — retained only so existing
+  systemd unit env files referencing it don't break.
+
+**Pending-embedding retry queue (Epic 24, Story 24.4):**
+- When an embedding update is skipped (lock held) or fails (non-zero exit), the
+  affected agent is recorded as a marker file under
+  `$EMBEDDINGS_DIR/pending-embeddings/<agent>` so the work is never silently
+  dropped. The marker's contents are the failure count.
+- Pending updates are retried under the same `flock` on: watcher startup, after
+  every ingestion batch (any collection drains all markers), and on a periodic
+  `PENDING_RETRY_INTERVAL`-second inotify-idle tick — so a quiet collection's
+  docs don't stay unsearchable.
+- Lock-held skips record a marker but do **not** count as failures (lock
+  contention can't exhaust the retry budget). After `MAX_EMBED_ATTEMPTS` genuine
+  failures the agent is given up on: a loud `ERROR` log and a
+  `<agent>.failed` marker you can inspect and remove to requeue (after a manual
+  rebuild).
+- On a successful update the marker is removed.
 
 **Incremental vs full rebuild:**
 - `--incremental` appends new embeddings to existing FAISS index

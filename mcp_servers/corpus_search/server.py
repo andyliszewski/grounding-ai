@@ -31,6 +31,7 @@ from sentence_transformers import SentenceTransformer
 from grounding.citations import format_citation_prefix
 from grounding.hybrid import HybridConfig, search_hybrid
 from grounding.reranker import RerankConfig, reassign_ranks
+from grounding.vector_store import adapt_chunk_map_for_search
 from grounding import reranker as _reranker_module
 
 # Configure logging
@@ -170,7 +171,7 @@ def search_corpus(
             top_k,
         )
 
-        adapted_map = chunk_map if isinstance(chunk_map, dict) else {"chunks": chunk_map}
+        adapted_map = adapt_chunk_map_for_search(chunk_map)
 
         def _load_index_fn(_dir):
             return index, adapted_map
@@ -328,7 +329,7 @@ async def list_tools():
         Tool(
             name="search_corpus",
             description=(
-                "Search the agent's corpus for relevant documents using semantic similarity. "
+                "Search the agent's corpus for relevant documents. "
                 "Returns chunks from ingested PDFs, EPUBs, and documents that match the query. "
                 "Use this to find information in your knowledge base before answering questions."
             ),

@@ -10,11 +10,16 @@ from grounding.eval.baseline import (
     load_baseline,
 )
 from grounding.eval.fixtures import (
+    ANSWER_CATEGORIES,
+    AnswerSpec,
     Expected,
     FixtureItem,
     FixtureSet,
     FixtureValidationError,
+    NumericAnswer,
     SCHEMA_VERSION,
+    SECTION_PAGED,
+    UNANSWERABLE_KINDS,
     UnknownAgentError,
     load_fixtures,
 )
@@ -36,11 +41,16 @@ from grounding.eval.runner import (
 )
 
 __all__ = [
+    "ANSWER_CATEGORIES",
+    "AnswerSpec",
+    "NumericAnswer",
     "Expected",
     "FixtureItem",
     "FixtureSet",
     "FixtureValidationError",
     "SCHEMA_VERSION",
+    "SECTION_PAGED",
+    "UNANSWERABLE_KINDS",
     "UnknownAgentError",
     "load_fixtures",
     # metrics

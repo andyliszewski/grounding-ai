@@ -1,0 +1,25 @@
+# Template unit for the Grounding review-queue worker (sidecar to the watcher).
+# Copy to ~/.config/systemd/user/grounding-review-worker.service, replace the
+# <PLACEHOLDER> paths with absolute paths for your host, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now grounding-review-worker
+# The live unit on the ingestion server lives in ~/.config/systemd/user/ (untracked).
+[Unit]
+Description=Grounding Review-Queue Worker (chunk-content-informed filename cleanup)
+After=network.target grounding-watcher.service
+PartOf=grounding-watcher.service
+
+[Service]
+Type=simple
+ExecStart=<REPO_DIR>/scripts/review-queue-worker.sh
+Restart=always
+RestartSec=10
+Environment=PATH=<REPO_DIR>/venv/bin:/usr/bin:/bin
+Environment=CORPUS_DIR=<DATA_DIR>/corpus
+Environment=ORIGINALS_DIR=<DATA_DIR>/originals
+Environment=REVIEW_QUEUE=<REPO_DIR>/filename-review-queue.tsv
+Environment=LOG_FILE=<LOG_DIR>/grounding-review-worker.log
+Environment=AUTO_CLEAN_MODEL=llama3.2:3b
+Environment=AUTO_CLEAN_API_URL=http://localhost:11434/v1/chat/completions
+
+[Install]
+WantedBy=default.target

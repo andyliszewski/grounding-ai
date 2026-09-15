@@ -86,6 +86,113 @@ def test_run_controller_generates_outputs(
     assert "chunk_count" in manifest
 
 
+def test_run_controller_rejects_slug_collision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Story 23.2: two differently-named files that slugify to the same slug
+    must not silently overwrite each other; the second is failed out and the
+    first document survives intact."""
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    # Both slugify to "report-2024".
+    (input_dir / "Report 2024.pdf").write_text("PDF", encoding="utf-8")
+    (input_dir / "report_2024.pdf").write_text("PDF", encoding="utf-8")
+    config = PipelineConfig(
+        input_dir=input_dir,
+        output_dir=tmp_path / "out",
+        metadata={"chunk_size": 50, "chunk_overlap": 10},
+    )
+
+    def fake_parse_pdf(path: Path, ocr_mode: str = "auto") -> List[SimpleNamespace]:
+        return [SimpleNamespace(text=f"section-{path.name}")]
+
+    def fake_format_markdown(
+        elements: List[SimpleNamespace],
+        *,
+        metadata=None,
+        allow_plaintext_fallback=False,
+        source_name: str,
+    ) -> str:
+        return "\n\n".join(element.text for element in elements) + "\n"
+
+    monkeypatch.setattr("grounding.pipeline.parse_pdf", fake_parse_pdf)
+    monkeypatch.setattr(
+        "grounding.pipeline.format_markdown_with_map", _as_result(fake_format_markdown)
+    )
+
+    result = run_controller(config)
+
+    assert result.stats.total_files == 2
+    assert result.stats.succeeded == 1
+    assert result.stats.failed == 1
+    reasons = [f["reason"] for f in result.stats.failed_files]
+    assert any("slug_collision" in r for r in reasons)
+
+    # Exactly one corpus dir at the shared slug, holding the winner's content.
+    slug_dir = config.output_dir / "report-2024"
+    assert slug_dir.exists()
+    doc_text = (slug_dir / "doc.md").read_text(encoding="utf-8")
+
+    from grounding.manifest import ManifestManager
+
+    manifest = ManifestManager.load(config.output_dir / "_index.json")
+    entries = [d for d in manifest.docs if d.slug == "report-2024"]
+    assert len(entries) == 1  # no duplicate doc_path
+    winner = entries[0].orig_name
+    assert f"section-{winner}" in doc_text  # winner's content not overwritten
+
+    loser = "report_2024.pdf" if winner == "Report 2024.pdf" else "Report 2024.pdf"
+    assert any(loser in f["file"] for f in result.stats.failed_files)
+
+
+def test_run_controller_reingest_same_file_updates_in_place(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Story 23.2: re-ingesting the SAME source (same orig_name) is not a
+    collision; it updates in place with a single manifest entry."""
+    input_dir = tmp_path / "pdfs"
+    input_dir.mkdir()
+    (input_dir / "paper.pdf").write_text("PDF", encoding="utf-8")
+    config = PipelineConfig(
+        input_dir=input_dir,
+        output_dir=tmp_path / "out",
+        metadata={"chunk_size": 50, "chunk_overlap": 10},
+    )
+
+    version = {"text": "first-version-body"}
+
+    def fake_parse_pdf(path: Path, ocr_mode: str = "auto") -> List[SimpleNamespace]:
+        return [SimpleNamespace(text=version["text"])]
+
+    def fake_format_markdown(
+        elements: List[SimpleNamespace],
+        *,
+        metadata=None,
+        allow_plaintext_fallback=False,
+        source_name: str,
+    ) -> str:
+        return "\n\n".join(element.text for element in elements) + "\n"
+
+    monkeypatch.setattr("grounding.pipeline.parse_pdf", fake_parse_pdf)
+    monkeypatch.setattr(
+        "grounding.pipeline.format_markdown_with_map", _as_result(fake_format_markdown)
+    )
+
+    run_controller(config)
+    version["text"] = "second-version-body-revised"  # changed content -> new doc_id
+    result = run_controller(config)
+
+    assert result.stats.failed == 0  # no spurious collision on re-ingest
+
+    from grounding.manifest import ManifestManager
+
+    manifest = ManifestManager.load(config.output_dir / "_index.json")
+    entries = [d for d in manifest.docs if d.slug == "paper"]
+    assert len(entries) == 1  # superseded, not duplicated
+    doc_text = (config.output_dir / "paper" / "doc.md").read_text(encoding="utf-8")
+    assert "second-version-body-revised" in doc_text
+
+
 def test_run_controller_dry_run(monkeypatch: pytest.MonkeyPatch, sample_config: PipelineConfig) -> None:
     sample_config.dry_run = True
 

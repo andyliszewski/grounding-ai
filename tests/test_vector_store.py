@@ -153,6 +153,44 @@ class TestWriteVectorIndex:
         tmp_files = list(output_dir.glob("*.tmp"))
         assert len(tmp_files) == 0, "No temporary files should remain after write"
 
+    def test_index_temp_name_is_unique(self, sample_embeddings, output_dir, monkeypatch):
+        """FAISS index temp file uses a unique name, not a fixed `.tmp`.
+
+        Story 24.1 (W3): two concurrent embedding writers against one agent dir
+        must not share a fixed temp-file name, or one can clobber the other's
+        temp and pair a stale index with a fresh chunk map. We capture the temp
+        path passed to faiss.write_index across two writes and assert they differ
+        and are unique per-call.
+        """
+        import grounding.vector_store as vs
+
+        output_dir.mkdir(parents=True)
+
+        captured = []
+        real_write_index = vs.faiss.write_index
+
+        def spy_write_index(index, path, *args, **kwargs):
+            captured.append(path)
+            return real_write_index(index, path, *args, **kwargs)
+
+        monkeypatch.setattr(vs.faiss, "write_index", spy_write_index)
+
+        write_vector_index(sample_embeddings, output_dir)
+        write_vector_index(sample_embeddings, output_dir)
+
+        assert len(captured) == 2
+        # Neither write used the old fixed `_embeddings.tmp` name...
+        for path in captured:
+            assert not path.endswith("_embeddings.tmp"), (
+                f"temp name should be unique, not the fixed _embeddings.tmp: {path}"
+            )
+            assert path.endswith(".tmp")
+        # ...and the two writes used distinct temp names.
+        assert captured[0] != captured[1], "concurrent writers must get distinct temp names"
+
+        # No temp files leak after the writes complete.
+        assert list(output_dir.glob("*.tmp")) == []
+
 
 class TestLoadVectorIndex:
     """Test load_vector_index() function."""
@@ -588,6 +626,50 @@ class TestAppendToVectorIndex:
         _, chunk_map_after = load_vector_index(index_dir)
         assert chunk_map_after["format_version"] == FORMAT_VERSION_INCREMENTAL
         assert "chunks" in chunk_map_after
+
+    def test_append_leaves_coherent_index_and_no_temp(self, index_dir_v11):
+        """Story 24.2 AC4: the staged-then-commit append produces a coherent
+        index (ntotal == index_size) and leaves no .tmp files behind."""
+        np.random.seed(105)
+        new_embeddings = {
+            "doc6-0001": np.random.rand(384).astype(np.float32),
+            "doc6-0002": np.random.rand(384).astype(np.float32),
+        }
+
+        append_to_vector_index(new_embeddings, index_dir_v11)
+
+        index_after, chunk_map_after = load_vector_index(index_dir_v11)
+        assert index_after.ntotal == chunk_map_after["index_size"]
+        assert list(index_dir_v11.glob("*.tmp")) == [], "no staged temp files should remain"
+
+    def test_append_cleans_up_staged_index_on_chunkmap_failure(
+        self, index_dir_v11, monkeypatch
+    ):
+        """Story 24.2 AC4: if chunk-map staging fails after the FAISS index is
+        staged, the staged index temp is cleaned up and the on-disk index is
+        left untouched (the renames never happened)."""
+        import grounding.vector_store as vs
+
+        index_before, _ = load_vector_index(index_dir_v11)
+        ntotal_before = index_before.ntotal
+
+        # Force the chunk-map staging to fail.
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(vs, "_stage_text", boom)
+
+        np.random.seed(106)
+        new_embeddings = {"doc7-0001": np.random.rand(384).astype(np.float32)}
+
+        with pytest.raises(OSError, match="disk full"):
+            append_to_vector_index(new_embeddings, index_dir_v11)
+
+        # No temp leftover, and the live index is unchanged (commit never ran).
+        assert list(index_dir_v11.glob("*.tmp")) == []
+        index_after, chunk_map_after = load_vector_index(index_dir_v11)
+        assert index_after.ntotal == ntotal_before
+        assert index_after.ntotal == chunk_map_after["index_size"]
 
 
 class TestTombstoneDocuments:

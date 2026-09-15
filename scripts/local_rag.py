@@ -55,6 +55,7 @@ from filesystem_tools import create_all_filesystem_tools
 from grounding.citations import format_citation_prefix
 from grounding.hybrid import HybridConfig
 from grounding.reranker import RerankConfig, reassign_ranks
+from grounding.vector_store import adapt_chunk_map_for_search
 from grounding import reranker as _reranker_module
 
 logger = logging.getLogger("local_rag")
@@ -247,8 +248,9 @@ def search_corpus(
 
         def _load_index_fn(_dir):
             # Reuse already-loaded index/chunk_map rather than reloading from disk.
-            # search_hybrid expects a chunk_map dict (with "chunks" list); adapt.
-            adapted_map = chunk_map if isinstance(chunk_map, dict) else {"chunks": chunk_map}
+            # search_hybrid expects a chunk_map dict with "chunks" AND a metadata
+            # format_version (see adapt_chunk_map_for_search / Story 19.5).
+            adapted_map = adapt_chunk_map_for_search(chunk_map)
             return index, adapted_map
 
         def _embed_fn(q: str):
@@ -405,7 +407,7 @@ Question: {query}"""
         spinner.start()
 
     try:
-        response = requests.post(api_url, json=payload, timeout=120)
+        response = requests.post(api_url, json=payload, timeout=600)
         response.raise_for_status()
         return response.json()["choices"][0]["message"]["content"]
     except requests.exceptions.ConnectionError:

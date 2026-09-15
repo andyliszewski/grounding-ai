@@ -734,6 +734,115 @@ class TestCLIEmbeddingsIncremental:
         assert "New:" in result2.stdout
         assert "Skipped:" in result2.stdout
 
+    def test_incremental_keeps_faiss_bm25_lockstep(self, corpus_with_meta: Path):
+        """Story 23.3: a clean incremental append keeps FAISS and BM25 equal."""
+        import json
+        import yaml
+        from datetime import datetime, timezone
+        from grounding.vector_store import load_vector_index
+        from grounding.bm25 import load_bm25_index
+
+        assert run_cli("embeddings", "--corpus", str(corpus_with_meta)).returncode == 0
+
+        # Add a new document, then append incrementally.
+        manifest_path = corpus_with_meta / "_index.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["docs"].append({
+            "doc_id": "lock1234", "slug": "lock-doc", "orig_name": "lock.pdf",
+            "chunk_count": 1, "collections": [],
+        })
+        manifest["updated_utc"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        manifest_path.write_text(json.dumps(manifest))
+        d = corpus_with_meta / "lock-doc" / "chunks"
+        d.mkdir(parents=True)
+        (d / "ch_0001.md").write_text("---\ndoc_id: lock1234\n---\nLock content.")
+        (corpus_with_meta / "lock-doc" / "meta.yaml").write_text(
+            yaml.dump({"doc_id": "lock1234", "slug": "lock-doc",
+                       "hashes": {"file_sha1": "sha1_lock"}})
+        )
+
+        result = run_cli("embeddings", "--corpus", str(corpus_with_meta), "--incremental")
+        assert result.returncode == 0
+        assert "Mode: Incremental update" in result.stdout
+
+        out = corpus_with_meta / "embeddings" / "full"
+        index, _ = load_vector_index(out)
+        bm25 = load_bm25_index(out)
+        assert bm25 is not None
+        assert index.ntotal == len(bm25.chunk_map["chunks"])  # lockstep
+
+    def test_incremental_rebuilds_when_bm25_absent(self, corpus_with_meta: Path):
+        """Story 23.3: FAISS present but BM25 missing (W2 / pre-19.1) -> the
+        incremental run detects the incoherence and full-rebuilds both, so BM25
+        covers the whole corpus and matches FAISS."""
+        from grounding.vector_store import load_vector_index
+        from grounding.bm25 import (
+            load_bm25_index, BM25_PICKLE_FILENAME, BM25_MAP_FILENAME,
+        )
+
+        assert run_cli("embeddings", "--corpus", str(corpus_with_meta)).returncode == 0
+        out = corpus_with_meta / "embeddings" / "full"
+
+        # Simulate a pre-19.1 / shadow state: drop the BM25 sidecar, keep FAISS.
+        (out / BM25_PICKLE_FILENAME).unlink()
+        (out / BM25_MAP_FILENAME).unlink()
+
+        result = run_cli("embeddings", "--corpus", str(corpus_with_meta), "--incremental")
+        assert result.returncode == 0
+        assert "incoherent" in result.stderr.lower()
+
+        index, _ = load_vector_index(out)
+        bm25 = load_bm25_index(out)
+        assert bm25 is not None
+        assert index.ntotal == len(bm25.chunk_map["chunks"])  # rebuilt, lockstep
+
+    def _delete_other_doc_from_manifest(self, corpus: Path):
+        import json
+        manifest = json.loads((corpus / "_index.json").read_text())
+        manifest["docs"] = [d for d in manifest["docs"] if d["doc_id"] != "def67890"]
+        (corpus / "_index.json").write_text(json.dumps(manifest))
+
+    def test_incremental_reconciles_faiss_tombstoned_bm25_live(self, corpus_with_meta: Path):
+        """Story 23.4: the W5 crash state — tombstoned in FAISS, live in BM25 —
+        is never re-detected by staleness (which reads the FAISS map), so it must
+        be healed by reconciliation on the next incremental run."""
+        import json
+        from grounding.vector_store import tombstone_documents
+
+        assert run_cli("embeddings", "--corpus", str(corpus_with_meta)).returncode == 0
+        out = corpus_with_meta / "embeddings" / "full"
+
+        self._delete_other_doc_from_manifest(corpus_with_meta)
+        # Simulate a crash that tombstoned only FAISS (the unrecoverable inverse).
+        tombstone_documents(["def67890"], out)
+
+        result = run_cli("embeddings", "--corpus", str(corpus_with_meta), "--incremental")
+        assert result.returncode == 0
+
+        bm25_map = json.loads((out / "_bm25_map.json").read_text())
+        bm25_del = [c for c in bm25_map["chunks"] if c.get("doc_id") == "def67890"]
+        assert bm25_del and all(c["deleted_utc"] for c in bm25_del)  # BM25 healed
+
+    def test_incremental_reconciles_bm25_tombstoned_faiss_live(self, corpus_with_meta: Path):
+        """Story 23.4: a crash after the BM25 tombstone but before the FAISS one
+        (the new write order) completes on the next run — deleted doc gone from
+        both channels."""
+        import json
+        from grounding.bm25 import tombstone_bm25_documents
+
+        assert run_cli("embeddings", "--corpus", str(corpus_with_meta)).returncode == 0
+        out = corpus_with_meta / "embeddings" / "full"
+
+        self._delete_other_doc_from_manifest(corpus_with_meta)
+        tombstone_bm25_documents(["def67890"], out)  # BM25 done, FAISS pending
+
+        result = run_cli("embeddings", "--corpus", str(corpus_with_meta), "--incremental")
+        assert result.returncode == 0
+
+        faiss_map = json.loads((out / "_chunk_map.json").read_text())
+        faiss_del = [c for c in faiss_map["chunks"] if c.get("doc_id") == "def67890"]
+        assert faiss_del and all(c["deleted_utc"] for c in faiss_del)  # FAISS healed
+
     def test_check_shows_recommendation(self, corpus_with_meta: Path):
         """Test --check shows incremental recommendation when stale."""
         import json
@@ -798,3 +907,127 @@ class TestCLIEmbeddingsIncremental:
         assert "Vectors:" in result2.stdout
         assert "Tombstones:" in result2.stdout
         assert "Created:" in result2.stdout
+
+    def test_incremental_recovers_from_corrupted_index(self, corpus_with_meta: Path):
+        """Story 24.2 / W4: a crash between the FAISS index and chunk-map renames
+        leaves index.ntotal disagreeing with the chunk map's index_size, so
+        load_vector_index raises ValueError. The CLI must catch ValueError (not
+        only FileNotFoundError), fall back to a full rebuild, recover a coherent
+        index, and let a subsequent --incremental run proceed normally.
+        """
+        import faiss
+        import numpy as np
+
+        # First run: create a healthy full index.
+        result1 = run_cli("embeddings", "--corpus", str(corpus_with_meta))
+        assert result1.returncode == 0
+
+        index_path = corpus_with_meta / "embeddings" / "full" / "_embeddings.faiss"
+        assert index_path.exists()
+
+        # Simulate the W4 crash state: the FAISS index advanced by one vector but
+        # the chunk map was never updated (rename of the index landed, rename of
+        # the chunk map didn't). index.ntotal now exceeds the map's index_size.
+        index = faiss.read_index(str(index_path))
+        index.add(np.random.rand(1, index.d).astype("float32"))
+        faiss.write_index(index, str(index_path))
+
+        # A bare incremental run must now RECOVER rather than crash on a traceback.
+        result2 = run_cli(
+            "embeddings", "--corpus", str(corpus_with_meta), "--incremental"
+        )
+        assert result2.returncode == 0, (
+            f"expected recovery, got rc={result2.returncode}\n{result2.stderr}"
+        )
+        # AC 2: the recovery is loud, not a silent swallow.
+        assert "Corrupted incremental index detected" in result2.stderr
+        # It rebuilt rather than appending onto the corrupt state.
+        assert "Mode: Full generation" in result2.stdout
+
+        # AC 3: the rebuilt index is coherent (load no longer raises).
+        from grounding.vector_store import load_vector_index
+
+        rebuilt_index, chunk_map = load_vector_index(index_path.parent)
+        assert rebuilt_index.ntotal == chunk_map["index_size"]
+
+        # AC 3: a subsequent --incremental run proceeds normally.
+        result3 = run_cli(
+            "embeddings", "--corpus", str(corpus_with_meta), "--incremental"
+        )
+        assert result3.returncode == 0
+        assert (
+            "No changes detected" in result3.stdout
+            or "Embeddings are up to date" in result3.stdout
+        )
+
+    # ----------------------------------------------------------------------
+    # --update-doc-id (force-update for reprocessed docs)
+    # ----------------------------------------------------------------------
+
+    def test_update_doc_id_help_text(self):
+        """The new flag is documented in --help."""
+        result = run_cli("embeddings", "--help")
+        assert result.returncode == 0
+        assert "--update-doc-id" in result.stdout
+
+    def test_update_doc_id_forces_update_when_sha_unchanged(self, corpus_with_meta: Path):
+        """A doc with unchanged file_sha1 normally gets skipped on --incremental.
+        Passing --update-doc-id must promote it to 'updated' so its vectors get
+        tombstoned and re-appended. This is the reprocess.sh path: same source
+        bytes, new chunk text.
+        """
+        # First run: build initial index.
+        result1 = run_cli("embeddings", "--corpus", str(corpus_with_meta))
+        assert result1.returncode == 0
+
+        # Sanity: a plain --incremental sees zero changes (file hashes match).
+        result2 = run_cli(
+            "embeddings",
+            "--corpus", str(corpus_with_meta),
+            "--incremental",
+        )
+        assert result2.returncode == 0
+        assert "Updated documents: 0" in result2.stdout
+
+        # Now with --update-doc-id: that doc must be marked updated, even
+        # though its file_sha1 is identical.
+        result3 = run_cli(
+            "embeddings",
+            "--corpus", str(corpus_with_meta),
+            "--incremental",
+            "--update-doc-id", "abc12345",
+        )
+        assert result3.returncode == 0
+        assert "Updated documents: 1" in result3.stdout
+        assert "Tombstoning 1 updated documents" in result3.stdout
+
+    def test_update_doc_id_repeatable_for_multiple_docs(self, corpus_with_meta: Path):
+        """The flag accumulates across multiple invocations."""
+        # Seed index.
+        run_cli("embeddings", "--corpus", str(corpus_with_meta))
+
+        # Force-update both docs in the same call.
+        result = run_cli(
+            "embeddings",
+            "--corpus", str(corpus_with_meta),
+            "--incremental",
+            "--update-doc-id", "abc12345",
+            "--update-doc-id", "def67890",
+        )
+        assert result.returncode == 0
+        assert "Updated documents: 2" in result.stdout
+
+    def test_update_doc_id_warns_on_unknown_id(self, corpus_with_meta: Path):
+        """Unknown doc_ids must be reported, not silently ignored."""
+        run_cli("embeddings", "--corpus", str(corpus_with_meta))
+        result = run_cli(
+            "embeddings",
+            "--corpus", str(corpus_with_meta),
+            "--incremental",
+            "--update-doc-id", "nosuchdoc",
+        )
+        assert result.returncode == 0
+        assert "not in manifest" in result.stderr
+        assert "nosuchdoc" in result.stderr
+        # And no spurious update should land.
+        assert "Updated documents: 0" in result.stdout

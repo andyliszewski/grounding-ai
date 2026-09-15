@@ -65,7 +65,11 @@ def test_split_markdown_respects_custom_config() -> None:
     custom_chunks = split_markdown(document, custom_config)
 
     assert len(custom_chunks) > len(default_chunks)
-    assert all(len(chunk) <= custom_config.chunk_size + 20 for chunk in custom_chunks)
+    # Merging an orphan into an already-full neighbour necessarily exceeds
+    # chunk_size; growth is bounded by the merge threshold. See
+    # chunker._merge_undersized.
+    bound = custom_config.chunk_size + custom_config.resolved_min_chunk_size() + 20
+    assert all(len(chunk) <= bound for chunk in custom_chunks)
 
 
 @pytest.mark.parametrize(

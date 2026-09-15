@@ -192,6 +192,114 @@ Examples:
     return agents_parser
 
 
+def check_faiss_bm25_coherence(output_dir: Path) -> tuple[bool, str]:
+    """Compare the FAISS vector count against the BM25 chunk count (Story 23.3).
+
+    The two index writers append in lockstep and both keep tombstones as soft
+    deletes, so a coherent index pair has equal totals:
+    ``index.ntotal == len(bm25 chunks)``. A divergence means the pair is in a
+    half-applied state:
+
+    - **W1** — an incremental run appended to FAISS but the BM25 append failed
+      afterward, leaving FAISS ahead. The next staleness check derives "what's
+      indexed" from the FAISS map alone, so the missing chunks would never reach
+      BM25 without this reconciliation.
+    - **W2** — the agent was embedded before the BM25 sidecar existed (or a prior
+      shadow write), so BM25 is absent or covers only a slice while FAISS holds
+      the whole corpus.
+
+    Returns ``(coherent, reason)``. ``reason`` is empty when coherent. A missing
+    FAISS index returns coherent (nothing to reconcile; the full-build path
+    handles a fresh index).
+    """
+    from grounding.vector_store import load_vector_index, FAISS_INDEX_FILENAME
+    from grounding.bm25 import load_bm25_index, BM25FormatError
+
+    if not (output_dir / FAISS_INDEX_FILENAME).exists():
+        return True, ""
+
+    try:
+        index, _ = load_vector_index(output_dir)
+        n_faiss = index.ntotal
+    except Exception as exc:  # unreadable / corrupt index — force a rebuild
+        return False, f"FAISS index unreadable ({exc})"
+
+    try:
+        bm25 = load_bm25_index(output_dir)
+    except BM25FormatError as exc:
+        return False, f"BM25 index unreadable ({exc})"
+
+    if bm25 is None or bm25.bm25 is None:
+        if n_faiss > 0:
+            return False, f"BM25 index missing while FAISS holds {n_faiss} vectors"
+        return True, ""
+
+    n_bm25 = len(bm25.chunk_map.get("chunks", []))
+    if n_faiss != n_bm25:
+        return False, f"FAISS has {n_faiss} vectors but BM25 has {n_bm25} chunks"
+    return True, ""
+
+
+def reconcile_tombstones(output_dir: Path) -> tuple[int, int]:
+    """Heal a half-applied tombstone pair (Story 23.4).
+
+    Tombstoning a deleted/updated document soft-deletes its chunks in BOTH the
+    FAISS chunk map and the BM25 map. A crash between the two writes leaves a
+    document tombstoned in one channel but live in the other. The staleness
+    check derives deletions from the FAISS map alone, so a FAISS-tombstoned /
+    BM25-live document is otherwise never retried and lingers forever in lexical
+    search results. This reconciliation runs each incremental pass and
+    tombstones, in each channel, any doc the other channel has already
+    tombstoned — healing both crash directions regardless of write order.
+
+    Idempotent (the tombstone primitives skip already-deleted chunks); neither
+    the FAISS index nor the BM25 pickle is rewritten — only the map JSONs.
+    Returns ``(bm25_added, faiss_added)``.
+    """
+    import json as _json
+    import logging
+
+    from grounding.vector_store import tombstone_documents, CHUNK_MAP_FILENAME
+    from grounding.bm25 import tombstone_bm25_documents, BM25_MAP_FILENAME
+
+    _logger = logging.getLogger("grounding.cli")
+
+    faiss_map_path = output_dir / CHUNK_MAP_FILENAME
+    bm25_map_path = output_dir / BM25_MAP_FILENAME
+    if not faiss_map_path.exists() or not bm25_map_path.exists():
+        return 0, 0
+
+    def _tombstoned_doc_ids(path: Path) -> set:
+        with open(path, "r", encoding="utf-8") as f:
+            cm = _json.load(f)
+        return {
+            c.get("doc_id")
+            for c in cm.get("chunks", [])
+            if c.get("deleted_utc") is not None and c.get("doc_id")
+        }
+
+    faiss_ts = _tombstoned_doc_ids(faiss_map_path)
+    bm25_ts = _tombstoned_doc_ids(bm25_map_path)
+
+    bm25_added = faiss_added = 0
+    faiss_only = faiss_ts - bm25_ts
+    if faiss_only:
+        bm25_added = tombstone_bm25_documents(sorted(faiss_only), output_dir)
+    bm25_only = bm25_ts - faiss_ts
+    if bm25_only:
+        faiss_added = tombstone_documents(sorted(bm25_only), output_dir)
+
+    if bm25_added or faiss_added:
+        _logger.warning(
+            "Reconciled half-applied tombstones at %s: +%d BM25, +%d FAISS "
+            "(a prior run crashed between the two tombstone writes)",
+            output_dir,
+            bm25_added,
+            faiss_added,
+        )
+    return bm25_added, faiss_added
+
+
 def embeddings_command(args: argparse.Namespace) -> int:
     """Handle the 'embeddings' subcommand for generating vector embeddings.
 
@@ -214,6 +322,7 @@ def embeddings_command(args: argparse.Namespace) -> int:
         write_bm25_index,
         append_to_bm25_index,
         tombstone_bm25_documents,
+        load_bm25_index,
     )
 
     logger = setup_logging(verbose=args.verbose, quiet_progress=not args.verbose)
@@ -304,6 +413,26 @@ def embeddings_command(args: argparse.Namespace) -> int:
             deleted_doc_ids = set(staleness_report.deleted_docs)
             updated_doc_ids = set(staleness_report.updated_docs) & manifest_doc_ids
 
+            # Honor --update-doc-id: doc_ids the caller explicitly wants
+            # treated as updated, even if file_sha1 didn't change. Reprocessing
+            # a doc whose source bytes are identical (e.g., re-running the
+            # ingest pipeline to backfill page metadata) leaves file_sha1
+            # unchanged, so the hash-based staleness check would skip it
+            # and the FAISS vectors would stay pointing at the old chunk
+            # text. The flag lets reprocess.sh (and any analogous tool)
+            # signal "I just changed this doc, re-embed its chunks."
+            forced_update_ids = set(getattr(args, "update_doc_id", []) or [])
+            if forced_update_ids:
+                in_manifest = forced_update_ids & manifest_doc_ids
+                missing = forced_update_ids - in_manifest
+                if missing:
+                    print(
+                        f"Warning: --update-doc-id values not in manifest: "
+                        f"{sorted(missing)}",
+                        file=sys.stderr,
+                    )
+                updated_doc_ids |= in_manifest
+
             # Warn if rebuild recommended
             if staleness_report.should_rebuild:
                 print(
@@ -320,6 +449,64 @@ def embeddings_command(args: argparse.Namespace) -> int:
             print("Index not found. Falling back to full generation.", file=sys.stderr)
             incremental_mode = False
             new_doc_ids = manifest_doc_ids
+        except ValueError as exc:
+            # Corrupted incremental state (Story 24.2 / W4): a crash between the
+            # FAISS index rename and the chunk-map rename in a prior append
+            # leaves index.ntotal disagreeing with the chunk map's index_size,
+            # so load_vector_index raises ValueError. Catching only
+            # FileNotFoundError before meant every subsequent --incremental run
+            # crashed on this traceback forever until a manual full rebuild.
+            # Recover automatically by rebuilding the whole agent-filtered index.
+            logger.warning(
+                "Corrupted incremental index detected (%s); rebuilding from "
+                "scratch for this agent.", exc, exc_info=True,
+            )
+            print(
+                f"Corrupted incremental index detected: {exc}\n"
+                "Falling back to a full rebuild to recover.",
+                file=sys.stderr,
+            )
+            incremental_mode = False
+            new_doc_ids = manifest_doc_ids
+            # Reset incremental tracking so the full path rewrites everything.
+            deleted_doc_ids = set()
+            updated_doc_ids = set()
+            skipped_doc_ids = set()
+
+    # Story 23.3: FAISS/BM25 coherence gate. An incremental append derives
+    # "what's already indexed" from the FAISS map alone, so a half-applied
+    # append (FAISS advanced, BM25 not — W1) or a BM25-absent index (pre-19.1 /
+    # shadow — W2) would silently persist: the missing chunks never reach BM25
+    # and hybrid search quietly loses lexical coverage. Detect the divergence
+    # here and self-heal by downgrading to a full rebuild, which rewrites BOTH
+    # indexes coherently over the whole (agent-filtered) corpus. This is the
+    # automatic recovery path — no manual rebuild needed.
+    if incremental_mode:
+        coherent, reason = check_faiss_bm25_coherence(output_dir)
+        if not coherent:
+            print(
+                f"Warning: FAISS/BM25 index pair is incoherent ({reason}). "
+                f"Rebuilding both indexes to restore coherence.",
+                file=sys.stderr,
+            )
+            logger.warning(
+                "Incoherent FAISS/BM25 pair at %s: %s; forcing full rebuild",
+                output_dir,
+                reason,
+            )
+            incremental_mode = False
+            new_doc_ids = manifest_doc_ids
+            deleted_doc_ids = set()
+            updated_doc_ids = set()
+            skipped_doc_ids = set()
+
+    # Story 23.4: heal any half-applied tombstone left by a crash between the
+    # BM25 and FAISS tombstone writes on a prior run. Runs before the
+    # no-changes early-return so a pure recovery pass still completes. A full
+    # rebuild (incremental downgraded above) rewrites both maps clean, so this
+    # only matters while still incremental.
+    if incremental_mode:
+        reconcile_tombstones(output_dir)
 
     # Print progress header
     print("\n=== Embedding Generation ===\n")
@@ -359,12 +546,16 @@ def embeddings_command(args: argparse.Namespace) -> int:
         print(f"\nMode: Full generation")
         docs_to_process = manifest_doc_ids
 
-    # Tombstone deleted documents first (incremental mode only)
+    # Tombstone deleted documents first (incremental mode only).
+    # Story 23.4: tombstone BM25 before FAISS. The FAISS tombstone is the commit
+    # point — staleness re-detects a deletion only while the doc is still live in
+    # the FAISS map — so doing it last means a crash leaves the recoverable
+    # "BM25 done, FAISS pending" state rather than the inverse.
     if incremental_mode and deleted_doc_ids:
         print(f"\nTombstoning {len(deleted_doc_ids)} deleted documents...")
+        tombstone_bm25_documents(list(deleted_doc_ids), output_dir)
         tombstoned_count = tombstone_documents(list(deleted_doc_ids), output_dir)
         print(f"  Tombstoned {tombstoned_count} chunks")
-        tombstone_bm25_documents(list(deleted_doc_ids), output_dir)
 
     # Filter documents to only those we need to process
     docs_to_embed = [doc for doc in manifest.docs if doc.doc_id in docs_to_process]
@@ -408,6 +599,24 @@ def embeddings_command(args: argparse.Namespace) -> int:
 
             # Read all chunk files
             chunk_files = sorted(doc_dir.glob("ch_*.md"))
+
+            # Story 23.1: the chunk directory is the source of truth for what to
+            # embed. With write-time cleanup in place (writer.py) ch_*.md exactly
+            # matches the current document; a count mismatch against the
+            # manifest's chunk_count signals stale chunk files left by a pre-23.1
+            # re-ingest, which would otherwise be embedded as orphaned content.
+            # Warn loudly so the corpus can be rebuilt rather than silently
+            # embedding stale chunks.
+            if doc.chunk_count is not None and len(chunk_files) != doc.chunk_count:
+                logger.warning(
+                    "Chunk count mismatch for %s: %d ch_*.md on disk vs %d in "
+                    "manifest; possible stale chunks from a pre-23.1 re-ingest, "
+                    "consider a full rebuild",
+                    doc.slug,
+                    len(chunk_files),
+                    doc.chunk_count,
+                )
+
             for chunk_file in chunk_files:
                 chunk_text = chunk_file.read_text(encoding="utf-8")
 
@@ -450,11 +659,12 @@ def embeddings_command(args: argparse.Namespace) -> int:
     ordered_doc_ids = [chunk_metadata[cid].get("doc_id") for cid in ordered_ids]
 
     if incremental_mode:
-        # Tombstone updated docs before appending new embeddings
+        # Tombstone updated docs before appending new embeddings.
+        # Story 23.4: BM25 before FAISS (FAISS tombstone is the commit point).
         if updated_doc_ids:
             print(f"  Tombstoning {len(updated_doc_ids)} updated documents...")
-            tombstone_documents(list(updated_doc_ids), output_dir)
             tombstone_bm25_documents(list(updated_doc_ids), output_dir)
+            tombstone_documents(list(updated_doc_ids), output_dir)
 
         # Append new embeddings
         vectors_added = append_to_vector_index(embeddings, output_dir, chunk_metadata)
@@ -677,6 +887,19 @@ Examples:
         help="Incremental update: only embed new/updated documents, tombstone deleted ones",
     )
     embeddings_parser.add_argument(
+        "--update-doc-id",
+        action="append",
+        default=[],
+        metavar="DOC_ID",
+        help=(
+            "Force the given doc_id to be treated as updated (tombstone its "
+            "current vectors and re-embed from corpus). Repeatable. Use when "
+            "you've reprocessed a doc whose source bytes are unchanged — the "
+            "automatic file_sha1-based staleness check can't see that the "
+            "chunks changed."
+        ),
+    )
+    embeddings_parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
@@ -689,8 +912,9 @@ Examples:
 def main():
     """CLI entry point for grounding."""
     # Check if first argument is a subcommand
-    subcommands = {"embeddings", "agents", "eval"}
+    subcommands = {"embeddings", "agents", "eval", "eval-answers"}
     if len(sys.argv) > 1 and sys.argv[1] in subcommands:
+        from grounding.eval.answers.cli import _create_eval_answers_parser
         from grounding.eval.cli import _create_eval_parser
 
         # Use subcommand parser
@@ -702,6 +926,7 @@ def main():
         _create_embeddings_parser(subparsers)
         _create_agents_parser(subparsers)
         _create_eval_parser(subparsers)
+        _create_eval_answers_parser(subparsers)
 
         args = parser.parse_args()
         if hasattr(args, "func"):
@@ -755,6 +980,16 @@ Subcommands:
         type=int,
         default=150,
         help="Overlap characters between chunks (default: 150)",
+    )
+    parser.add_argument(
+        "--min-chunk-size",
+        type=int,
+        default=None,
+        help=(
+            "Fold chunks shorter than this into the next chunk, so orphaned "
+            "captions and titles stay with the block they name. 0 disables "
+            "merging (default: auto, 200 capped at chunk_size/4)"
+        ),
     )
     parser.add_argument(
         "--parser",
@@ -846,6 +1081,20 @@ Subcommands:
         )
         sys.exit(1)
 
+    if args.min_chunk_size is not None and args.min_chunk_size < 0:
+        print(
+            f"Error: Minimum chunk size ({args.min_chunk_size}) cannot be negative",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if args.min_chunk_size is not None and args.min_chunk_size >= args.chunk_size:
+        print(
+            f"Error: Minimum chunk size ({args.min_chunk_size}) must be less than chunk size ({args.chunk_size})",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Validate input directory exists
     if not args.input_dir.exists():
         print(f"Error: Input directory does not exist: {args.input_dir}", file=sys.stderr)
@@ -910,6 +1159,17 @@ Subcommands:
         print(f"Error: No PDF or EPUB files found in input directory: {args.input_dir}", file=sys.stderr)
         sys.exit(1)
 
+    # Record the threshold actually applied, never the `None` sentinel: this
+    # metadata is written verbatim into doc.md front matter, and the resolved
+    # value is what makes the run reproducible.
+    from grounding.chunker import ChunkConfig as _ChunkConfig
+
+    resolved_min_chunk_size = _ChunkConfig(
+        chunk_size=args.chunk_size,
+        chunk_overlap=args.chunk_overlap,
+        min_chunk_size=args.min_chunk_size,
+    ).resolved_min_chunk_size()
+
     # Prepare pipeline configuration
     config = PipelineConfig(
         input_dir=args.input_dir.resolve(),
@@ -928,6 +1188,7 @@ Subcommands:
         metadata={
             "chunk_size": args.chunk_size,
             "chunk_overlap": args.chunk_overlap,
+            "min_chunk_size": resolved_min_chunk_size,
             "parser": args.parser,
             "music_format": args.music_format,
             "formula_format": args.formula_format,
@@ -944,6 +1205,7 @@ Subcommands:
         print(f"  output_dir: {config.output_dir}")
         print(f"  chunk_size: {args.chunk_size}")
         print(f"  chunk_overlap: {args.chunk_overlap}")
+        print(f"  min_chunk_size: {resolved_min_chunk_size}")
         print(f"  parser: {config.parser}")
         print(f"  ocr: {config.ocr_mode}")
         print(f"  music_format: {config.music_format}")

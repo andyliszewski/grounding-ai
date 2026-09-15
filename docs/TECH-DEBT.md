@@ -1,6 +1,6 @@
 # Technical Debt
 
-**Last Updated**: 2026-04-15 (TD-004 added)
+**Last Updated**: 2026-05-27 (TD-005 added)
 
 This document tracks implementation-level technical debt and optimization opportunities that don't warrant full epic planning. For larger initiatives, see `docs/ROADMAP.md` and `docs/epics/`.
 
@@ -230,6 +230,119 @@ run the comparison and prepare the PR.
 Users who want hybrid retrieval today can turn it on explicitly via
 `--hybrid` or `retrieval.hybrid.enabled: true` in their local
 `config.yaml`. The default only affects the out-of-box experience.
+
+---
+
+## TD-005: Tombstone Bloat in Agent FAISS Indices
+
+**Status**: Open
+**Priority**: P3 (Low)
+**Added**: 2026-05-27
+**Related**: TD-001 (incremental embeddings), `reprocess.sh` Epic-17 page-number reingest
+
+### Current Limitation
+
+`grounding embeddings --incremental --update-doc-id <id>` tombstones the
+old chunks of an updated doc by writing `deleted_utc` into
+`_chunk_map.json` and appending the new vectors to `_embeddings.faiss`.
+FAISS' `IndexFlatL2` format does not reclaim slots — tombstoned vectors
+remain on disk and are filtered at query time via the chunk-map. Over
+many reingests this inflates index files.
+
+After the Epic-17 page-number reprocess pass (2026-05-25 → 2026-05-27,
+983 docs reprocessed via `scripts/reprocess.sh`), 26 agent indices now
+carry **81,229 tombstones total / 4.6M live+tombstoned entries (1.8%
+overall) / ~119 MB reclaimable across 6.7 GB on disk**. No correctness
+impact — queries already filter tombstones — but index files are
+larger and slightly slower to load/scan than they need to be.
+
+### Snapshot (2026-05-27, post-reprocess)
+
+The full sorted list lives in the maintainer's private runbook; the
+shape is summarized here with three illustrative rows drawn from the
+maintainer's 26-agent index. `pct` is the tombstone fraction of total
+entries; `reclaim` is approximately `(tombstones / total) ×
+faiss_size`.
+
+| agent | total | tombstones | pct | faiss (MB) | reclaim (MB) |
+|---|--:|--:|--:|--:|--:|
+| mathematician | 554,163 | 8,065 | 1.5% | 811.8 | 11.8 |
+| ceo | 226,570 | 7,726 | 3.4% | 331.9 | 11.3 |
+| data-scientist | 731,002 | 1,859 | 0.3% | 1,070.8 | 2.7 |
+| **TOTAL (26 agents)** | **4,599,447** | **81,229** | **1.8%** | **6,737.5** | **119.0** |
+
+Distribution shape across all 26:
+
+- The 1.8% overall tombstone fraction is concentrated. The top agent
+  by reclaim alone carries ~28% of all reclaimable bytes; the top
+  four carry ~64%.
+- Two agents are over 10% tombstoned (the worst is ~12.5%); most
+  others sit under 5%. Volume alone does not predict bloat —
+  `data-scientist` is the largest index by chunk count but its
+  tombstone fraction is the lowest of any non-zero agent (a single
+  doc reprocessed under `--update-doc-id`).
+- Eight of 26 agents (0 tombstones) need no rebuild at all.
+
+### Technical Analysis
+
+The tombstone mechanism is by design — FAISS has no in-place delete,
+and rewriting the entire index on every doc update would defeat the
+purpose of `--incremental`. The trade-off is that index files grow
+monotonically until a full rebuild replaces them.
+
+A full rebuild is a single command per agent:
+
+```bash
+./venv/bin/grounding embeddings --agent <name> \
+    --corpus /path/to/corpus \
+    --agents-dir /path/to/agents \
+    --out /path/to/embeddings/<name>
+    # note: no --incremental → full rebuild from scratch
+```
+
+This re-embeds every live chunk from the corpus (CPU cost roughly
+proportional to live chunk count, not total-including-tombstones).
+Tombstoned vectors are dropped entirely and the new index is a tight
+packing.
+
+### Proposed Solution
+
+A `grounding embeddings --rebuild --agent <name>` flag, or a
+`scripts/rebuild-bloated-embeddings.sh` driver that:
+
+1. Walks `_chunk_map.json` for each agent in `EMBEDDINGS_DIR`.
+2. Computes tombstone fraction; skips agents below a threshold (e.g.
+   `--min-tombstone-pct 5` or `--min-reclaim-mb 5`).
+3. For each over-threshold agent: acquires `_embeddings.lock`, deletes
+   `_embeddings.faiss` + `_chunk_map.json` + `_bm25.pkl` +
+   `_bm25_map.json`, then runs full `grounding embeddings --agent X`
+   (no `--incremental`) to rebuild from corpus.
+4. Releases the lock.
+
+Sequential per agent so the watcher's auto-update path stays
+contention-free. Watcher should be paused (`systemctl --user stop
+grounding-watcher`) for the duration since rebuild times are
+non-trivial on the larger agents (~hundreds of thousands of live
+entries takes ~hours on CPU).
+
+Order of operations should follow the reclaim ranking — highest
+reclamation first, agents with zero tombstones skipped entirely.
+
+### Complexity Estimate
+
+Small: no new logic, just a driver around the existing full-rebuild
+code path. Most of the work is in the driver's safety net (lock
+acquisition, atomic swap, fallback on failure). ~half a day to write
+and test, separate from the (long) wall-clock time to actually run
+the rebuilds.
+
+### Workaround
+
+None needed — queries already correctly filter tombstones at runtime
+via the chunk-map. The only user-visible symptom is larger-than-needed
+files on disk and marginally slower index load on agent startup. Most
+agents stay under 5% tombstone bloat; only two on the maintainer's
+snapshot exceeded 10%.
 
 ---
 

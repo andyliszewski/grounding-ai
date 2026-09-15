@@ -39,8 +39,10 @@ RUN pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.0.0"
 # It arrives transitively via mcp (floored only at >=0.27). This server runs
 # over stdio (no HTTP listener) so the vector is not exploitable here, but the
 # explicit floor keeps a known-vulnerable Starlette out of the image.
+# mcp is capped below 2: mcp 2.x removed the low-level Server.list_tools/call_tool
+# decorators this server is written against.
 RUN pip install \
-    "mcp>=1.0.0" \
+    "mcp>=1.0.0,<2" \
     "starlette>=1.0.1" \
     "faiss-cpu>=1.7.0" \
     "sentence-transformers>=2.2.0" \

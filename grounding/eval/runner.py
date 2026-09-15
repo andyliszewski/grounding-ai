@@ -246,6 +246,16 @@ def run_eval(
     skipped: list[str] = []
 
     for fixture_item in fixture_set.items:
+        # Story 25.1: answer-benchmark items marked unanswerable have no gold
+        # document or page, so there is nothing for retrieval to hit.
+        if fixture_item.answer is not None and not fixture_item.answer.answerable:
+            logger.info(
+                "fixture item %s is unanswerable (answer.answerable: false); skipping",
+                fixture_item.id,
+            )
+            skipped.append(fixture_item.id)
+            continue
+
         expected_set = set(fixture_item.expected.doc_ids)
         unknown = expected_set - manifest_doc_ids
         if unknown:

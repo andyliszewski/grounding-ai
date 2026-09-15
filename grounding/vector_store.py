@@ -23,10 +23,12 @@ Chunk Map Schema Versions:
 
 import json
 import logging
+import os
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Union
 
 import faiss
 import numpy as np
@@ -44,6 +46,71 @@ FORMAT_VERSION_WITH_METADATA = "1.1"
 FORMAT_VERSION_INCREMENTAL = "1.2"
 TOMBSTONE_REBUILD_THRESHOLD = 0.30  # Recommend rebuild when >30% tombstoned
 TOMBSTONE_WARNING_THRESHOLD = 0.20  # Log warning when >20% tombstoned
+
+
+def _make_temp_path(target_path: Path) -> Path:
+    """Return a unique, never-before-used temp path beside ``target_path``.
+
+    Uses ``tempfile.mkstemp`` so two concurrent writers against one directory
+    never share a temp-file name. The fixed ``<name>.tmp`` name used previously
+    let two concurrent embedding writers clobber each other's temp file and pair
+    a stale index with a fresh chunk map -> permanent size-mismatch ``ValueError``
+    on load (Epic 24, Story 24.1; W3).
+    """
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(target_path.parent),
+        prefix=target_path.stem + ".",
+        suffix=".tmp",
+    )
+    os.close(fd)
+    return Path(tmp_name)
+
+
+def _stage_faiss_index(index: "faiss.Index", index_path: Path) -> Path:
+    """Write a FAISS index to a unique temp file beside ``index_path``.
+
+    Returns the temp path *without* renaming it into place, so the caller can
+    commit several staged files with back-to-back renames (minimizing the crash
+    window between them). The temp file is removed if the write fails.
+    """
+    temp_index_path = _make_temp_path(index_path)
+    try:
+        faiss.write_index(index, str(temp_index_path))
+    except Exception:
+        temp_index_path.unlink(missing_ok=True)
+        raise
+    return temp_index_path
+
+
+def _stage_text(target_path: Path, content: str, encoding: str = "utf-8") -> Path:
+    """Write ``content`` to a unique temp file beside ``target_path``.
+
+    Returns the temp path without renaming it into place (commit-later pattern).
+    The temp file is removed if the write fails.
+    """
+    temp_path = _make_temp_path(target_path)
+    try:
+        with open(temp_path, "w", encoding=encoding) as f:
+            f.write(content)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+    return temp_path
+
+
+def _write_faiss_index_atomic(index: "faiss.Index", index_path: Path) -> None:
+    """Write a FAISS index to ``index_path`` atomically via a unique temp file.
+
+    The final ``replace`` is an atomic same-filesystem rename. The temp file is
+    removed if the rename fails so a crash does not litter the directory with
+    orphaned ``.tmp`` files (Epic 24, Story 24.1; W3).
+    """
+    temp_index_path = _stage_faiss_index(index, index_path)
+    try:
+        temp_index_path.replace(index_path)
+    except Exception:
+        temp_index_path.unlink(missing_ok=True)
+        raise
 
 
 @dataclass
@@ -175,9 +242,7 @@ def write_vector_index(
     # Write FAISS index to disk (atomic)
     index_path = output_dir / FAISS_INDEX_FILENAME
     try:
-        temp_index_path = index_path.with_suffix(".tmp")
-        faiss.write_index(index, str(temp_index_path))
-        temp_index_path.replace(index_path)
+        _write_faiss_index_atomic(index, index_path)
         logger.info(f"Wrote FAISS index to {index_path}")
     except Exception as e:
         logger.error(f"Failed to write FAISS index: {e}", exc_info=True)
@@ -269,6 +334,43 @@ def load_vector_index(corpus_dir: Path) -> Tuple[faiss.Index, Dict]:
 
     logger.info(f"Successfully loaded vector store with {index.ntotal} embeddings")
     return index, chunk_map
+
+
+def adapt_chunk_map_for_search(chunk_map: Union[Dict, list]) -> Dict:
+    """Build a ``search_similar_chunks``-compatible map from a cached chunk_map.
+
+    The retrieval surfaces (MCP server, ``local_rag``, ``search_corpus_tool``)
+    cache the chunk_map as a bare *list* of entries extracted from the on-disk
+    dict's ``chunks`` key, discarding ``format_version``. ``search_similar_chunks``
+    branches on ``format_version``: without it the map defaults to ``"1.0"`` and
+    reads the absent ``chunk_ids`` list, so every FAISS hit is skipped and the
+    dense channel returns nothing. In the hybrid path that silently degrades
+    fusion to BM25-only (or, when BM25 is also absent, to zero results). This is
+    the Story 19.5 regression.
+
+    This helper is the single point all three surfaces call to re-wrap their
+    cached map before handing it to ``search_hybrid``'s ``load_index_fn``, so the
+    fix cannot drift back apart across the three copies (Story 19.5 AC 6):
+
+    - A bare list of dict entries (the v1.1/v1.2 in-memory shape) is wrapped as a
+      metadata-format map so the dense channel reads ``chunks``.
+    - An already-correct dict is returned unchanged, or stamped with the metadata
+      version if it carries ``chunks`` but no ``format_version``.
+    - A bare list of *string* entries (the oldest path-only format, which
+      predates ``chunk_id`` and cannot participate in hybrid fusion) is wrapped
+      without a metadata version, leaving behavior unchanged for that legacy
+      shape rather than crashing on ``str.get``.
+    """
+    if isinstance(chunk_map, dict):
+        if "format_version" not in chunk_map:
+            chunks = chunk_map.get("chunks") or []
+            if chunks and isinstance(chunks[0], dict):
+                return {**chunk_map, "format_version": FORMAT_VERSION_INCREMENTAL}
+        return chunk_map
+
+    if chunk_map and isinstance(chunk_map[0], dict):
+        return {"chunks": chunk_map, "format_version": FORMAT_VERSION_INCREMENTAL}
+    return {"chunks": chunk_map}
 
 
 def search_similar_chunks(
@@ -735,24 +837,34 @@ def append_to_vector_index(
 
     chunk_map["chunks"] = chunks
 
-    # Write updated FAISS index atomically
+    # Stage BOTH updated files to temp paths first, then commit them with two
+    # back-to-back renames. This shrinks the crash window between "the new index
+    # is live" and "the new chunk map is live" to a single rename (Story 24.2
+    # AC4 / W4): all the expensive work -- FAISS serialization and chunk-map
+    # JSON encoding -- happens before either file is swapped in. A crash even in
+    # that one-rename gap is still recoverable (load_vector_index raises
+    # ValueError -> the CLI rebuilds, Story 24.2), but it is now far rarer.
+    # Per-file writes remain atomic (each file appears via its own rename).
     try:
-        temp_index_path = index_path.with_suffix(".tmp")
-        faiss.write_index(index, str(temp_index_path))
-        temp_index_path.replace(index_path)
-        logger.debug(f"Updated FAISS index at {index_path}")
+        temp_index_path = _stage_faiss_index(index, index_path)
     except Exception as e:
         logger.error(f"Failed to write FAISS index: {e}", exc_info=True)
         raise
 
-    # Write updated chunk map atomically
     try:
         chunk_map_json = json.dumps(chunk_map, indent=2)
-        atomic_write(chunk_map_path, chunk_map_json)
-        logger.debug(f"Updated chunk map at {chunk_map_path}")
+        temp_map_path = _stage_text(chunk_map_path, chunk_map_json)
     except Exception as e:
         logger.error(f"Failed to write chunk map: {e}", exc_info=True)
+        # Drop the already-staged index temp so we don't leak it.
+        temp_index_path.unlink(missing_ok=True)
         raise
+
+    # Commit: two adjacent atomic renames, minimal window between them.
+    temp_index_path.replace(index_path)
+    temp_map_path.replace(chunk_map_path)
+    logger.debug(f"Updated FAISS index at {index_path}")
+    logger.debug(f"Updated chunk map at {chunk_map_path}")
 
     logger.info(
         f"Appended {vectors_added} vectors. Index now has {index.ntotal} total vectors."

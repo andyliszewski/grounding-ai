@@ -43,7 +43,10 @@ jobs:
           key: st-${{ runner.os }}-all-MiniLM-L6-v2-v1
 
       - name: Install grounding-ai
-        run: pip install -e .
+        run: |
+          # CPU-only PyTorch; see the same step in ci.yml.
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e .
 
       - name: Cache mini FAISS index
         id: cache-mini-index

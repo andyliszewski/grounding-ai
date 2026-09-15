@@ -81,7 +81,7 @@ class AgenticConfig:
     """Configuration for agentic loop behavior."""
     max_iterations: int = 5
     verbose: bool = False
-    timeout: int = 120  # seconds per LLM call
+    timeout: int = 600  # seconds per LLM call
     show_spinner: bool = True  # Show spinner while waiting for LLM
     num_predict: int = 2048  # Max tokens in response (Ollama default is often 128)
 

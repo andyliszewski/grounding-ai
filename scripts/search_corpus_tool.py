@@ -36,6 +36,7 @@ if str(_REPO_ROOT) not in sys.path:
 from grounding.citations import format_citation_prefix  # noqa: E402
 from grounding.hybrid import HybridConfig  # noqa: E402
 from grounding.reranker import RerankConfig, reassign_ranks  # noqa: E402
+from grounding.vector_store import adapt_chunk_map_for_search  # noqa: E402
 from grounding import reranker as _reranker_module  # noqa: E402
 
 
@@ -264,12 +265,9 @@ class SearchCorpusTool:
                 "hybrid_config is enabled but embeddings_dir was not provided"
             )
 
-        # Adapt chunk_map: search_hybrid expects a dict with "chunks" key.
-        adapted_map = (
-            self.chunk_map
-            if isinstance(self.chunk_map, dict)
-            else {"chunks": self.chunk_map}
-        )
+        # Adapt chunk_map: search_hybrid expects a dict with "chunks" key AND a
+        # metadata format_version (see adapt_chunk_map_for_search / Story 19.5).
+        adapted_map = adapt_chunk_map_for_search(self.chunk_map)
 
         def _load_index_fn(_dir):
             return self.index, adapted_map

@@ -50,6 +50,48 @@ def test_register_document_adds_and_replaces(tmp_path: Path) -> None:
     assert manifest.docs[0].orig_name == "alpha_updated.pdf"
 
 
+def test_register_document_supersedes_same_slug_new_doc_id(tmp_path: Path) -> None:
+    """Story 23.2: a revision (same slug, new doc_id from changed content)
+    replaces the prior entry instead of accumulating a duplicate doc_path."""
+    manifest = ManifestData(
+        created_utc="2025-01-01T00:00:00+00:00",
+        updated_utc="2025-01-01T00:00:00+00:00",
+        docs=[],
+    )
+    ManifestManager.register_document(
+        manifest,
+        ManifestEntry(doc_id="v1", slug="alpha", orig_name="alpha.pdf",
+                      doc_path="alpha/doc.md"),
+    )
+    ManifestManager.register_document(
+        manifest,
+        ManifestEntry(doc_id="v2", slug="alpha", orig_name="alpha.pdf",
+                      doc_path="alpha/doc.md"),
+    )
+
+    assert [doc.doc_id for doc in manifest.docs] == ["v2"]
+    doc_paths = [doc.doc_path for doc in manifest.docs]
+    assert len(doc_paths) == len(set(doc_paths))  # no duplicate doc_path
+
+
+def test_register_document_no_duplicate_doc_path_across_slugs(tmp_path: Path) -> None:
+    """Distinct slugs coexist; the slug-uniqueness rule does not collapse them."""
+    manifest = ManifestData(
+        created_utc="2025-01-01T00:00:00+00:00",
+        updated_utc="2025-01-01T00:00:00+00:00",
+        docs=[],
+    )
+    for slug in ("alpha", "beta", "gamma"):
+        ManifestManager.register_document(
+            manifest,
+            ManifestEntry(doc_id=slug[0], slug=slug, orig_name=f"{slug}.pdf",
+                          doc_path=f"{slug}/doc.md"),
+        )
+    assert {doc.slug for doc in manifest.docs} == {"alpha", "beta", "gamma"}
+    doc_paths = [doc.doc_path for doc in manifest.docs]
+    assert len(doc_paths) == len(set(doc_paths))
+
+
 def test_write_and_load_round_trip(tmp_path: Path) -> None:
     manifest_path = tmp_path / "_index.json"
     manifest = ManifestData(
