@@ -1,0 +1,520 @@
+# Epic 25 answer benchmark: PUBLIC question set for the implant-eng-public agent.
+# Corpus: benchmarks/public-corpus/ (25 US government documents; see README.md and inventory.md).
+#
+# Authorship (see docs/epics/epic-25-grounded-answer-benchmark.md, Story 25.5). Andy wrote four
+# items (tag author-andy; pub-004 also edited-claude). Claude (Opus 5) drafted the rest from the
+# documents on 2026-09-15 (tag author-claude-draft). Andy vetted all 30 the same day and kept
+# them; after his questions, pub-002's gold page was widened to [10, 11] and pub-403 was
+# reworded to name a finite-width plate. Items Claude is likely to know from memory carry the
+# tag likely-known. Comments above each item quote the supporting text.
+#
+# Pages are 1-based PDF page indexes (the viewer's page box), not printed page numbers.
+
+agent: implant-eng-public
+version: 1
+source_license: public_domain
+
+items:
+  # ANDY'S QUESTION (wording as in benchmark.txt, 2026-09-15). Source: "Class I (general
+  # controls) for a goniometer that does not use electrode lead wires and patient cables"
+  # [cfr-21-part-888-2025, p.5]
+  - id: pub-001
+    query: "What is the device classification (class III, II, I) of a powered goniometer without electrode lead wires and patient cables?"
+    expected:
+      doc_ids: ["0ce2b093"]
+      page: 5
+      section: "§ 888.1500(b)(1)"
+    tags: ["standard", "author-andy"]
+    answer:
+      category: standard
+      gold: "Class I (general controls), exempt from 510(k) premarket notification subject to the limitations in § 888.9."
+      must_include: ["Class I"]
+      answerable: true
+
+  # ANDY'S QUESTION. Note: at work you would say "pedicle screw"; your call. Source: "Class II
+  # (special controls), when a semi-rigid system is intended to provide immobilization and
+  # stabilization" [cfr-21-part-888-2025, p.11]
+  - id: pub-002
+    query: "What classification is a semi-rigid thoracolumbosacral medical screw system?"
+    expected:
+      doc_ids: ["0ce2b093"]
+      page: [10, 11]
+      section: "§ 888.3070(a)(2) definition, (b)(3) classification"
+    tags: ["standard", "author-andy"]
+    answer:
+      category: standard
+      gold: "Class II (special controls), for any indication as an adjunct to fusion. Beyond the rigid-system special controls, it must show clinical performance data supporting the intended use, including fusion compared with a clinically acceptable fusion rate."
+      must_include: ["Class II"]
+      answerable: true
+
+  # Andy's original wording: "Name the tests used to measure material toughness."
+  # DRAFT (Claude, tightened from Andy's question). Source: "maximum energy developed by the hammer is 120 ft-lb in the Izod test and 240 ft-lb in the Charpy test" [doe-hdbk-1017-1-material-science-v1, p.78]
+  - id: pub-004
+    query: "In the DOE material science fundamentals handbook, how much impact energy can the Charpy pendulum deliver at most, in ft-lb?"
+    expected:
+      doc_ids: ["775f74b8"]
+      page: 78
+      section: "Toughness, Charpy and Izod tests (MS-02, Properties of Metals)"
+    tags: ["table", "author-andy", "edited-claude"]
+    answer:
+      category: table
+      gold: "240 ft-lb (the handbook gives 120 ft-lb for the Izod test)."
+      numeric:
+        value: 240
+        unit: "ft-lb"
+        abs_tol: 0
+      must_include: []
+      answerable: true
+
+  # ANDY'S QUESTION. Source: "operation be limited above the FTE temperature, or NDT + 60°F.
+  # Under such conditions, no brittle fracture can occur" [doe-hdbk-1017-2-material-science-v2,
+  # p.39, printed MS-04 Page 5]
+  - id: pub-005
+    query: "For a load that doesn't cause plastic deformation, what conditions must be met so no brittle fracture can occur?"
+    expected:
+      doc_ids: ["41ec5758"]
+      page: 39
+      section: "MS-04, Brittle Fracture"
+    tags: ["judgment", "author-andy"]
+    answer:
+      category: judgment
+      gold: "Operate above the nil-ductility transition (NDT) temperature, and for greater safety above the FTE temperature, NDT + 60°F; under those conditions no brittle fracture can occur for purely elastic loads."
+      must_include: ["operate above the NDT temperature", "for margin, above the FTE temperature, NDT + 60°F"]
+      answerable: true
+
+  # DRAFT (Claude). Source: "Class II (special controls). ... In vivo performance testing ... histopathological and histomorphometric assessment" [cfr-21-part-888-2025, p.8]
+  - id: pub-101
+    query: "A sleeve that is implanted around a metal bone screw that has lost its grip in bone, to restore fixation: what FDA class is it, and what does the regulation require the in vivo testing to show?"
+    expected:
+      doc_ids: ["0ce2b093"]
+      page: 8
+      section: "§ 888.3043"
+    tags: ["standard", "author-claude-draft"]
+    answer:
+      category: standard
+      gold: "It is a screw sleeve bone fixation device, Class II with special controls (21 CFR 888.3043). In vivo testing must show the device gives enough stability for the fracture to heal and causes no adverse biologic response, assessed by histopathology and histomorphometry."
+      must_include:
+        - "Class II (special controls), 21 CFR 888.3043"
+        - "in vivo testing shows enough stability for fracture healing"
+        - "no adverse biologic response, by histopathological and histomorphometric assessment"
+      answerable: true
+
+  # DRAFT (Claude). Source: "FDA disagrees that it should maintain the exceptions set forth at § 820.180(c)" [fr-qmsr-final-rule-2024, p.19]
+  - id: pub-102
+    query: "Once the new QMSR is in force, can an FDA investigator ask to see our management review, internal audit and supplier audit reports? The old QS regulation kept those out of inspections."
+    expected:
+      doc_ids: ["fa8f8887"]
+      page: 19
+      section: "Comment 55, former § 820.180(c)"
+    tags: ["standard", "author-claude-draft"]
+    answer:
+      category: standard
+      gold: "Yes. The final rule does not carry over the former § 820.180(c) exception for management review, quality audit and supplier audit reports, so those records are no longer shielded from FDA inspection; FDA cites harmonization with other regulators and MDSAP auditors, who already see them."
+      must_include:
+        - "yes, the records are no longer exempt from FDA inspection"
+        - "the former § 820.180(c) exception was not kept"
+      answerable: true
+
+  # DRAFT (Claude). Source: "a comparison should be made to the next highest major diameter listed" and table row "4  2.3" [fda-nonspinal-bone-screws-perf-criteria-2024, p.6 to 7]
+  - id: pub-103
+    query: "We are taking a 3.8 mm titanium cortical bone screw through FDA's performance-criteria 510(k) route. What minimum torsional yield strength should it meet, in N·m?"
+    expected:
+      doc_ids: ["f8c4da7f"]
+      page: [6, 7]
+      section: "1. Torsional Strength"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "2.3 N·m. A 3.8 mm diameter is not in the table, so the next larger listed diameter (4 mm) sets the criterion, and the criterion is torsional yield, not maximum torque."
+      numeric:
+        value: 2.3
+        unit: "N·m"
+        rel_tol: 0.02
+      must_include:
+        - "use the next larger listed diameter, 4 mm"
+      answerable: true
+
+  # DRAFT (Claude). Source: Table 4 row "Dynamic Compression Bending Runout Load to 5 Mc (N)  40 N  165 N  165 N" [fda-spinal-plating-perf-criteria-2020, p.8]
+  - id: pub-104
+    query: "For an anterior cervical plate tested as a two-level ASTM F1717 construct, what fatigue runout load at 5 million cycles does FDA's performance-criteria guidance set, in N?"
+    expected:
+      doc_ids: ["eccf8c84"]
+      page: 8
+      section: "Table 4"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "40 N runout load to 5 million cycles in dynamic compression bending (the thoracolumbar constructs are 165 N)."
+      numeric:
+        value: 40
+        unit: "N"
+        rel_tol: 0.02
+      answerable: true
+
+  # DRAFT (Claude). Source: "the mouse lymphoma gene mutation assay (OECD 490 ...), which is preferred since it detects the broadest set of genotoxic mechanisms" [fda-iso-10993-1-use-2023, p.40]
+  - id: pub-105
+    query: "We need genotoxicity data for a new permanent implant material. Alongside the bacterial reverse mutation test, which in vitro mammalian cell assay does FDA say it prefers, and why?"
+    expected:
+      doc_ids: ["199cba9b"]
+      page: 40
+      section: "F. Genotoxicity"
+    tags: ["guidance", "author-claude-draft"]
+    answer:
+      category: guidance
+      gold: "The mouse lymphoma gene mutation assay (OECD 490), preferred because it detects the broadest set of genotoxic mechanisms associated with carcinogenic activity; chromosomal aberration or micronucleus assays are the listed alternatives."
+      must_include:
+        - "mouse lymphoma gene mutation assay (OECD 490)"
+        - "detects the broadest set of genotoxic mechanisms linked to carcinogenicity"
+      answerable: true
+
+  # DRAFT (Claude). Source: "A passive implant with dimensions of less than 2 cm in all directions and at least 3 cm away from another passive implant does not need to be tested" [fda-mr-safety-testing-labeling-2023, p.12]
+  - id: pub-106
+    query: "A single titanium bone anchor, about 12 mm long and 5 mm across, is fully implanted with no other implant within 5 cm. For MR Conditional labeling at 1.5 T and 3 T, do we need to run RF heating tests on it?"
+    expected:
+      doc_ids: ["31fa320d"]
+      page: 12
+      section: "RF induced heating"
+    tags: ["guidance", "author-claude-draft"]
+    answer:
+      category: guidance
+      gold: "No. A passive implant under 2 cm in every direction and at least 3 cm from any other passive implant does not need RF heating testing at 3.0 T or below, because it is expected to heat less than 2 °C over 1 hour in Normal Operating Mode. The exclusion does not apply to several replicas within 3 cm of each other or to an implant partly outside the patient."
+      must_include:
+        - "no RF heating test needed at 3.0 T or below"
+        - "under 2 cm in all directions"
+        - "at least 3 cm from another passive implant"
+      answerable: true
+
+  # DRAFT (Claude). Source: "A rationale should be presented if post-yield stresses are observed and plasticity is omitted." [fda-reporting-computational-modeling-2016, p.24]
+  - id: pub-107
+    query: "Our FEA of a bone plate uses a linear-elastic titanium model, but some results come out above yield. For the modeling report in a 510(k), what does FDA expect us to say about that?"
+    expected:
+      doc_ids: ["60302bab"]
+      page: 24
+      section: "Appendix II, V.B Constitutive Laws: assumptions"
+    tags: ["guidance", "author-claude-draft"]
+    answer:
+      category: guidance
+      gold: "Give a rationale: with linear-elastic constitutive laws, generally only small-strain results should be presented, and FDA asks for a justification whenever post-yield stresses appear but plasticity was left out of the model."
+      must_include:
+        - "provide a rationale for omitting plasticity when post-yield stresses appear"
+        - "linear-elastic models should generally present only small-strain results"
+      answerable: true
+
+  # DRAFT (Claude). Source: "using either a polymeric adhesive with a minimum tensile strength of 24.1 MPa (ASTM C 633 ...)" [fda-modified-metallic-surfaces-1994, p.4]
+  - id: pub-108
+    query: "To tension-test a porous titanium bead coating, we plan to bond the pull fixture to the coating with an adhesive. What minimum tensile strength should the adhesive have, in MPa, under FDA's guidance for implants with modified metal surfaces?"
+    expected:
+      doc_ids: ["e7aa1015"]
+      page: 4
+      section: "Mechanical Properties - Modified Surface"
+    tags: ["guidance", "author-claude-draft"]
+    answer:
+      category: guidance
+      gold: "At least 24.1 MPa (per ASTM C 633); the alternative is to sinter a second substrate parallel to the first (ASTM F 1147), and the adhesive's properties must be reported. The interface itself must exceed 20 MPa in tension."
+      numeric:
+        value: 24.1
+        unit: "MPa"
+        rel_tol: 0.02
+      must_include:
+        - "24.1 MPa minimum adhesive tensile strength"
+      answerable: true
+
+  # DRAFT (Claude). Source: "a new 510(k) is also likely required if a device originally provided non-sterile is modified to be provided sterile" [fda-510k-for-device-change-2017, p.28]
+  - id: pub-201
+    query: "We have a cleared titanium bone plate that we ship non-sterile for the hospital to sterilize. If we start shipping it gamma-sterilized in sterile packaging, do we likely need a new 510(k)?"
+    expected:
+      doc_ids: ["d944819e"]
+      page: [27, 28]
+      section: "B3.1"
+    tags: ["judgment", "author-claude-draft"]
+    answer:
+      category: judgment
+      gold: "Yes. Changing a device from provided non-sterile to provided sterile is a change in how the device is provided, and FDA's device-change guidance says that likely requires a new 510(k)."
+      must_include:
+        - "A new 510(k) is likely required."
+        - "Going from non-sterile to sterile is a change in how the device is provided."
+      answerable: true
+
+  # DRAFT (Claude). Source: "the use of a 'split predicate' is inconsistent with the 510(k) regulatory standard" [fda-510k-program-substantial-equivalence-2014, p.14]
+  - id: pub-202
+    query: "Our new bone plate has the same intended use as cleared plate A, but its locking design and material match cleared device B, which has a different intended use. Can we cite A for the intended use and B for the technology to claim substantial equivalence?"
+    expected:
+      doc_ids: ["dff0cd46"]
+      page: 14
+      section: "IV.C Predicate Device(s), split predicate"
+    tags: ["judgment", "author-claude-draft"]
+    answer:
+      category: judgment
+      gold: "No. Matching intended use to one device and technological characteristics to a second device with a different intended use is a split predicate, which FDA considers inconsistent with the 510(k) standard; FDA must be able to work through decision points 1 to 4 (intended use and technological characteristics) with one predicate."
+      must_include:
+        - "No: this is a split predicate, which FDA considers inconsistent with the 510(k) standard."
+        - "FDA must be able to address decision points 1 through 4 (intended use and technological characteristics) using one predicate."
+      answerable: true
+
+  # DRAFT (Claude). Source: "decision consequence should be based on the specific question of interest and not on the specific device class" [fda-cms-credibility-2023, p.18]
+  - id: pub-203
+    query: "We're using FEA to support the fatigue claim in a 510(k) for a class II implant. A colleague says the model needs less credibility evidence than it would in a PMA, because the device is only class II. Is that right?"
+    expected:
+      doc_ids: ["6715aa83"]
+      page: [17, 18]
+      section: "VI.A.(3) Model risk"
+    tags: ["judgment", "author-claude-draft"]
+    answer:
+      category: judgment
+      gold: "No. FDA says decision consequence should be judged on the specific question of interest, not on the device class, so a 510(k) question can carry the same or greater decision consequence than a PMA question. The credibility needed follows model risk, which combines model influence (how much the FEA counts against bench or other evidence) with decision consequence (the harm if the decision is wrong, such as the implant fracturing)."
+      must_include:
+        - "No: decision consequence depends on the specific question of interest, not on the device class."
+        - "A 510(k) question can have the same or greater decision consequence than a PMA question."
+        - "Model risk, which sets the credibility needed, combines model influence and decision consequence."
+      answerable: true
+
+  # DRAFT (Claude). Source: "Improbable (E): Medium, Medium, Medium, Low" (Table III row) [mil-std-882e-chg1, p.20]
+  - id: pub-204
+    query: "On the default MIL-STD-882E risk matrix, what risk level does a hazard get if its worst credible outcome is a death but its probability is rated improbable?"
+    expected:
+      doc_ids: ["c1afa9a7"]
+      page: 20
+      section: "Table III"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "Medium (risk assessment code 1E: catastrophic severity, improbable probability)."
+      must_include:
+        - "Medium"
+      answerable: true
+
+  # DRAFT (Claude). Source: "test a minimum of two samples at the lowest load level in order to establish a resulting endurance load limit" [fda-ibfd-special-controls-2007, p.14]
+  - id: pub-205
+    query: "For a lumbar interbody fusion cage going through a 510(k), how many specimens does FDA want tested at the lowest load in the fatigue series, and what are they meant to establish?"
+    expected:
+      doc_ids: ["28e33873"]
+      page: 14
+      section: "8. Mechanical Testing, Static and Dynamic Testing Descriptions"
+    tags: ["guidance", "author-claude-draft"]
+    answer:
+      category: guidance
+      gold: "At least two specimens at the lowest load level, to establish the endurance load limit."
+      must_include:
+        - "At least two specimens at the lowest load level."
+        - "They establish the endurance load limit."
+      answerable: true
+
+  # DRAFT (Claude). Source: "AMS 4928 ... Bar ... Annealed ... 0.500-1.000 ... Fty, ksi: L ... 125c 134" [mil-hdbk-5j, p.946]
+  # Note: printed page 5-54, Table 5.4.1.0(c1). The MIL-T-9047 bar table on p.947 carries the same B-basis value.
+  - id: pub-301
+    query: "What B-basis longitudinal tensile yield strength can I design to for annealed Ti-6Al-4V round bar to AMS 4928, 3/4 inch diameter?"
+    expected:
+      doc_ids: ["9f9fdea2"]
+      page: 946
+      section: "Table 5.4.1.0(c1)"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "134 ksi, the B-basis longitudinal Fty for annealed AMS 4928 bar in the 0.500 to 1.000 inch diameter range (the A-basis entry in that range is footnoted as S-basis, 125 ksi)."
+      numeric:
+        value: 134
+        unit: "ksi"
+        rel_tol: 0.02
+      must_include: []
+      answerable: true
+
+  # DRAFT (Claude). Source: "Protoflight 1.4 1.25 1.2 N/A or 1.05**" [nasa-std-5001b-chg3, p.18]
+  # Note: Table 1 is repeated with the same values in the compliance matrix appendix (p.29).
+  - id: pub-302
+    query: "Under NASA-STD-5001B, what factor on limit load do I test a metallic flight structure to for strength qualification when I use the protoflight approach?"
+    expected:
+      doc_ids: ["5afd132e"]
+      page: 18
+      section: "Table 1"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "1.2 times limit load, the qualification test factor for protoflight metallic structures (the prototype approach uses 1.4)."
+      numeric:
+        value: 1.2
+        rel_tol: 0.02
+      must_include: []
+      answerable: true
+
+  # DRAFT (Claude). Source: "a. The fracture of the part does not cause a catastrophic hazard. b. The release of the mass does not cause a catastrophic hazard." [nasa-std-5019a-chg4, p.44]
+  # Note: 5019A sets no fixed mass limit (text searched); an answer quoting a mass threshold is not from this standard.
+  - id: pub-303
+    query: "For human-rated spaceflight hardware, what has to be shown before a small part can be treated as non-fracture-critical because only a small mass would be released if it broke?"
+    expected:
+      doc_ids: ["edf7995e"]
+      page: 44
+      section: "6.2.1 NFC Low-Released Mass"
+    tags: ["standard", "author-claude-draft"]
+    answer:
+      category: standard
+      gold: "That the fracture of the part does not cause a catastrophic hazard and that the release of the mass does not cause a catastrophic hazard, with damage to impacted composite or bonded parts, loss of function and impact with other hardware and personnel addressed; external parts also need an accepted debris-field criterion. The criteria are hazard-based, not a mass limit."
+      must_include:
+        - "fracture of the part does not cause a catastrophic hazard"
+        - "release of the mass does not cause a catastrophic hazard"
+      answerable: true
+
+  # DRAFT (Claude). Source: "The commonly assumed value for K is 0.2, but this value should not be used blindly." [nasa-rp-1228-fastener-design-manual, p.21]
+  # Note: the one textbook-level item in this group (T = KFd); the manual's 0.15 steel-on-steel value is what discriminates. Printed page 17.
+  - id: pub-304
+    query: "For a quick estimate of the tightening torque that gives the preload I want, what formula should I use, and what torque coefficient is realistic for steel on steel?"
+    expected:
+      doc_ids: ["987bcc1c"]
+      page: 21
+      section: "Alternative Torque Formula"
+    tags: ["formula", "author-claude-draft", "likely-known"]
+    answer:
+      category: formula
+      gold: "T = K F d, torque equals the torque coefficient times the axial preload times the bolt diameter, where K is calculated from the thread mean diameter, helix angle, thread angle and the thread and head or nut friction coefficients. The commonly assumed K = 0.2 should not be used blindly; about 0.15 is a more realistic typical value for steel on steel."
+      must_include:
+        - "T = K F d, with T torque, F axial load (preload) and d bolt diameter"
+        - "K depends on the thread and bearing-surface friction coefficients and the thread geometry"
+        - "K of about 0.15 for steel on steel rather than a blanket 0.2"
+      answerable: true
+
+  # DRAFT (Claude). Source: "For the case in which the threads are in the shear plane, as is typically the case for a bolt going into a tapped hole" [nasa-std-5020b, p.33]
+  # Note: Eq. 22 is on p.33; Psu-allow per Eq. 13 (minimum minor-diameter area) is referenced on p.34. The full-diameter-body case (Eq. 20) uses exponents 2.5 and 1.5 instead.
+  - id: pub-305
+    query: "When a bolt threads into a tapped hole, so the shear plane passes through the threads, what tension-shear interaction check at ultimate does NASA-STD-5020B give if I don't take credit for plastic bending?"
+    expected:
+      doc_ids: ["f327d38b"]
+      page: [33, 34]
+      section: "4.4.4 Combination of Loads, Eq. 22"
+    tags: ["formula", "author-claude-draft"]
+    answer:
+      category: formula
+      gold: "(Psu/Psu-allow)^1.2 + (Ptu/Ptu-allow + fbu/Ftu)^2 <= 1 (Eq. 22), where Psu-allow = Fsu x Am with Am the minimum minor-diameter area of the threads (Eq. 13), fbu the linear-elastic ultimate bending stress and Ftu the allowable ultimate tensile stress. Preload may be omitted at ultimate, and including the bending term is conservative."
+      must_include:
+        - "shear ratio Psu/Psu-allow raised to the power 1.2"
+        - "tension plus bending ratio (Ptu/Ptu-allow + fbu/Ftu) raised to the power 2"
+        - "the sum must be less than or equal to 1"
+      answerable: true
+
+  # DRAFT (Claude). Source: "The elongation of the bar is directly proportional to the tensile force and the length of the bar" [doe-hdbk-1017-1-material-science-v1, p.63]
+  - id: pub-401
+    query: "How do I estimate how much a bar stretches under an axial pull, and over what range of stress does that estimate hold?"
+    expected:
+      doc_ids: ["775f74b8"]
+      page: 63
+      section: "Hooke's Law, Equation (2-3) (MS-02, Properties of Metals)"
+    tags: ["formula", "author-claude-draft", "likely-known"]
+    answer:
+      category: formula
+      gold: "Elongation is delta = PL/(AE), with P the axial force, L the bar length, A the cross-sectional area and E Young's modulus; it holds only in the elastic range, where strain is proportional to stress (Hooke's law)."
+      must_include:
+        - "delta = PL/(AE)"
+        - "P is the axial force, L the length, A the cross-sectional area, E Young's modulus"
+        - "valid only in the elastic range, where strain is proportional to stress"
+      answerable: true
+
+  # DRAFT (Claude; ΔT changed from the handbook's worked example of 60°F to 540°F so the question
+  # is not the example). Source: "α = 5.8 x 10-6/°F (from Table 1)" and "E = 3.0 x 107 lb/in.2"
+  # [doe-hdbk-1017-2-material-science-v2, p.21]. 3.0e7 x 5.8e-6 x 300 = 52,200 psi.
+  - id: pub-402
+    query: "A carbon steel rod is fixed rigidly at both ends and its temperature rises by 300°F. Using the DOE material science handbook's property values for carbon steel, what thermal stress develops, in psi?"
+    expected:
+      doc_ids: ["41ec5758"]
+      page: 21
+      section: "Thermal stress, Eq. 3-5 and example (MS-03, Thermal Shock)"
+    tags: ["table", "author-claude-draft"]
+    answer:
+      category: table
+      gold: "About 52,200 psi, from stress = E x alpha x delta-T with the handbook's carbon steel values E = 3.0 x 10^7 psi and alpha = 5.8 x 10^-6 per °F, and delta-T = 300°F."
+      numeric:
+        value: 52200
+        unit: "psi"
+        rel_tol: 0.02
+      must_include: []
+      answerable: true
+
+  # DRAFT (Claude). Source: "a crack will propagate when the stress intensity factor reaches the critical value" [faa-damage-tolerance-handbook-vol1, p.62]; "a function of crack length and key structural dimensions such as plate width" [p.63]
+  - id: pub-403
+    query: "When I check whether a through crack in a finite-width plate will run, how is the mode I stress intensity factor written, and what condition makes the crack critical?"
+    expected:
+      doc_ids: ["9a46f5c3"]
+      page: [62, 63]
+      section: "Stress intensity factor, Equation (2-10) and Figure 2-7"
+    tags: ["formula", "author-claude-draft"]
+    answer:
+      category: formula
+      gold: "K_I = beta x sigma x sqrt(pi a) (Eq. 2-10), where beta is a function of crack length and structural dimensions such as plate width; for a crack much smaller than the plate it reduces to K_I = sigma x sqrt(pi a) (Eq. 2-5). The crack propagates when K_I reaches the critical value K_c (Eq. 2-7)."
+      must_include:
+        - "K_I = beta sigma sqrt(pi a), with a geometry factor that depends on crack length and plate width (any symbol for it)"
+        - "for a crack much smaller than the plate the factor is 1: K_I = sigma sqrt(pi a)"
+        - "the crack propagates when K_I reaches the critical value K_c"
+      answerable: true
+
+  # DRAFT (Claude, control item Claude already knows). Source: "actual life can be changed simply by rearranging the order of stress cycles in the spectrum" [faa-damage-tolerance-handbook-vol1, p.38]
+  # Reworded after Andy's vetting: specify finite width; Eq. 2-5 (p.62) is the small-crack case of Eq. 2-10 (p.63).
+  - id: pub-404
+    query: "With linear damage summation, how do I turn one flight's stress spectrum into a predicted number of flights to crack initiation, and what is the method's main weakness?"
+    expected:
+      doc_ids: ["9a46f5c3"]
+      page: [36, 38]
+      section: "Palmgren-Miner rule (Figure 1-13)"
+    tags: ["formula", "author-claude-draft", "control", "likely-known"]
+    answer:
+      category: formula
+      gold: "Sum the damage fractions n_i/N_i over the stress pairs in the spectrum; the number of flights to crack formation is the reciprocal of that total damage, reduced by a safety factor (a crack forms when the summed damage reaches 1). Its main weakness is that damage is assumed independent of the order of stress cycles, yet reordering the cycles changes the actual life."
+      must_include:
+        - "sum of n_i/N_i over the stress pairs in the spectrum"
+        - "life is the reciprocal of the total damage fraction, with a safety factor (crack at a damage sum of 1)"
+        - "ignores load sequence: reordering the cycles changes the actual life"
+      answerable: true
+
+  # DRAFT (Claude). Checked absent: text search for "risk management report", "overall residual
+  # risk" and "risk management file" finds nothing; dense and hybrid top 5 return general
+  # risk-management discussion (QMSR final rule p.10, 510(k) device-change guidance p.10 and 42,
+  # CM&S credibility p.17), none of ISO 14971's own requirements.
+  - id: pub-501
+    query: "Under ISO 14971:2019, what must the risk management review confirm before a device is released for sale, and where are its results recorded?"
+    expected:
+      doc_ids: []
+    tags: ["unanswerable", "author-claude-draft"]
+    answer:
+      category: unanswerable
+      gold: "Not in this library. The answer is in ISO 14971:2019 itself, which the library cites (QMSR final rule, CM&S credibility guidance, 510(k) device-change guidance) but does not hold."
+      answerable: false
+      unanswerable_kind: not_in_corpus
+
+  # DRAFT (Claude). Checked absent: "IM7" has no text hits and the "8552" hits are unrelated
+  # numbers; dense and hybrid top 5 return MIL-HDBK-5J metal tables and a CMH-17 reference in
+  # NASA-STD-6016C p.30 to 31, with no composite values.
+  - id: pub-502
+    query: "What B-basis 0-degree tensile strength does CMH-17 list for IM7/8552 unidirectional tape at room temperature, dry?"
+    expected:
+      doc_ids: []
+    tags: ["unanswerable", "author-claude-draft"]
+    answer:
+      category: unanswerable
+      gold: "Not in this library. CMH-17 is cited (NASA-STD-6016C, NASA-STD-5019A) but not held, and MIL-HDBK-5J covers metallic materials only."
+      answerable: false
+      unanswerable_kind: not_in_corpus
+
+  # DRAFT (Claude). Checked absent: the only "F2026" text hit is inside a file hash; PEEK appears
+  # only in a material list (ISO 10993-1 guidance) and a characterization note (Spinal System
+  # 510(k)s, 2004), with no strength values; dense and hybrid top 5 return coating and
+  # performance-criteria pages.
+  - id: pub-503
+    query: "What minimum ultimate tensile strength does ASTM F2026 set for implant-grade PEEK?"
+    expected:
+      doc_ids: []
+    tags: ["unanswerable", "author-claude-draft"]
+    answer:
+      category: unanswerable
+      gold: "Not in this library. ASTM F2026 is not held; PEEK appears only in passing (a material list in the ISO 10993-1 guidance and a characterization note in the Spinal System 510(k)s guidance), with no strength values."
+      answerable: false
+      unanswerable_kind: not_in_corpus
+
+  # DRAFT (Claude). False premise: 21 CFR 888.4540(b) makes these instruments Class I and exempt
+  # from 510(k), so no PMA applies. Hybrid search surfaces the 888.4500 to 888.4800 pages
+  # (cfr-21-part-888-2025, p.32 to 33).
+  - id: pub-504
+    query: "What clinical data does FDA require in a PMA for an orthopedic manual surgical instrument such as a bone tap or screwdriver?"
+    expected:
+      doc_ids: []
+    tags: ["unanswerable", "author-claude-draft"]
+    answer:
+      category: unanswerable
+      gold: "False premise: orthopedic manual surgical instruments (bone taps and screwdrivers included) are Class I (general controls) and exempt from 510(k) subject to the limitations in § 888.9 (21 CFR 888.4540(b)); no PMA applies."
+      answerable: false
+      unanswerable_kind: no_source

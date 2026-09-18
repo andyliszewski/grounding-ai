@@ -318,6 +318,22 @@ def test_mini_answers_fixture_loads():
     assert fixtures.page_offsets == {"doc-gamma": 2, "doc-beta": 0}
 
 
+PUBLIC_CORPUS = Path(__file__).resolve().parents[1] / "benchmarks" / "public-corpus"
+
+
+def test_public_corpus_question_set_loads_and_says_who_wrote_each_item():
+    """The published benchmark set (Story 25.5) stays loadable, and every item carries
+    exactly one author tag, so results can be read by author."""
+    fixtures = load_fixtures(
+        PUBLIC_CORPUS / "questions.yaml", agents_dir=PUBLIC_CORPUS / "agents"
+    )
+    assert fixtures.source_license == "public_domain"
+    assert fixtures.items
+    for item in fixtures.items:
+        authors = [t for t in item.tags if t in ("author-andy", "author-claude-draft")]
+        assert len(authors) == 1, f"{item.id} has author tags {authors}"
+
+
 # ---------------------------------------------------------------------------
 # Validation paths
 # ---------------------------------------------------------------------------

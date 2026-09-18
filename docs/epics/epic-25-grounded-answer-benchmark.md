@@ -233,7 +233,7 @@ Markdown and JSON per run:
 **Acceptance:** a report builds from the fake-client run, and a test proves publishable output
 contains no chunk text.
 
-### Story 25.5: Question set (Andy)
+### Story 25.5: Question set (Andy, with Claude drafts; amended below)
 
 30 to 50 questions in `docs/eval/fixtures/private/mechanical-engineer-answers.yaml`, written
 from Andy's own knowledge and then located in the PDF. Rough mix:
@@ -258,6 +258,29 @@ Rules:
   ungrounded condition is likely to cite, and mark section-paged handbooks `section`; the
   primary comparison is read only when metadata gaps leave at most 10% of ungrounded citations
   unresolvable.
+
+**Amended 2026-09-15, before the first run (Andy's decision).** The benchmark's question set is
+`benchmarks/public-corpus/questions.yaml`: 30 items (26 answerable, 4 unanswerable) against the
+public corpus. The private mechanical-engineer file above remains a separate, private set.
+Andy wrote four items. Claude (Opus 5) drafted the other 26 from the documents and checked
+each gold against its PDF page; Andy then vetted all 30, kept every one, and asked for two
+changes (a wider gold page on pub-002, a clearer question on pub-403). The rule "write each
+question before searching" therefore does not hold for the drafted items. Every item's tags
+record its author (`author-andy`, `author-claude-draft`, `edited-claude`), and the three
+textbook controls are tagged `likely-known`.
+
+Two biases follow, and the write-up names both:
+- A question drafted from the page that answers it leans toward what retrieval finds. The
+  drafts use work language rather than the source's wording, and no question repeats more than
+  seven consecutive words of its gold page; that reduces the bias without removing it.
+- A question drafted by the model under test may favour facts that model already knows, which
+  would narrow the gap between grounded and ungrounded correctness.
+
+Results by author tag are reported as exploratory, beside the primary comparison and never in
+place of it. Mix as drafted: table 7, standard 5, guidance 5, formula 5, judgment 4,
+unanswerable 4. At 26 answerable items the power simulation (`power.py --items 26`) gives
+expected 95% half-widths of ±12 points for one condition's verified rate, ±17 for the primary
+difference and ±14 for correctness, wider than the ±11, ±15 and ±12 computed at 35 below.
 
 ### Story 25.6: Run and write-up
 
@@ -342,3 +365,24 @@ which is why a small replicate cannot tell noise from a real difference. The rep
 descriptive: it is reported beside the primary result and never revises it. The write-up says
 plainly when the run-to-run move is at least half the primary difference, which is the case
 where the difference cannot be separated from the model's own sampling.
+
+### Amendment 2026-09-17, after grading (Andy's decision)
+
+Written after the first run was graded and its gates computed. It changes nothing above; it
+records what was done when the support gate failed.
+
+- **Round 1.** Andy's blind grades, plus two changes to citations he had flagged as uncertain in
+  his own notes (made before any comparison with the judge), were frozen and both gates computed
+  on them: correctness 89% agreement, kappa 0.67, n = 99, **pass**; support 90%, kappa 0.57,
+  n = 50, **fail**.
+- **Reviewed set.** The 16 rows where Andy and a judge disagreed were then reviewed with the
+  judge's verdict shown, and 12 grades changed. Only disagreements were reviewed, so that set can
+  only move toward the judge; it is reported as a sensitivity check and never gates.
+- **Retest.** In 4 of the 5 round-1 support disagreements the claim had two parts and the grading
+  screen lacked the judge's rule that support for one part is not support. The screen was
+  aligned; the judge (`support-v2`) was not changed. One batch of 30 citations Andy had not seen
+  was graded blind under terms written before grading: the same thresholds, one batch, no
+  extension. Result: 80% agreement, kappa 0.44, **fail**.
+- **Consequence.** Under **Gates**, the verified-citation rate and the primary comparison are
+  not published. Correctness, whose gate passed, is the reported result, human-primary. The
+  replicate was not run: its purpose was the run-to-run noise of the verified rate.

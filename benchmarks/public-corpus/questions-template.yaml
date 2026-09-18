@@ -6,7 +6,9 @@
 # How to write an item:
 #   1. Write the question from your own knowledge, worded the way you would ask it at work.
 #      Do not use corpus search to pick questions; that biases the set toward what retrieval
-#      already finds. Note how you located the page afterwards.
+#      already finds. Note how you located the page afterwards. If a model drafts an item
+#      instead, tag it author-claude-draft (yours author-andy) and vet it against the PDF; see
+#      epic 25, Story 25.5 for how the published set was made.
 #   2. Find the answer in the PDF and record the PDF page index: the number in the viewer's
 #      page box, counting from the first page of the file. Not the printed page number.
 #   3. Use the doc_id from inventory.md (it is the first 8 characters of the corpus

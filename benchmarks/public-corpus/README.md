@@ -60,7 +60,7 @@ python3.13 -m venv venv && ./venv/bin/pip install -e .          # 1. the groundi
 benchmarks/public-corpus/build.sh                                 # 2. fetch, verify SHA-256, ingest, embed
 ./venv/bin/grounding eval-answers --agent implant-eng-public \    # 3. prove it loads (no key, no spend)
     --agents-dir benchmarks/public-corpus/agents \
-    --fixtures <your-questions.yaml> \
+    --fixtures benchmarks/public-corpus/questions.yaml \
     --corpus ~/Documents/Corpora-public/corpus \
     --embeddings ~/Documents/Corpora-public/embeddings/implant-eng-public --dry-run
 ```
@@ -100,6 +100,7 @@ fixture `doc_ids`.
 | `build.sh` | fetch, ingest with pinned parameters, embed, check the BM25 sidecar |
 | `agents/implant-eng-public.yaml` | the benchmark agent; its five collection tags select exactly these 25 documents |
 | `inventory.md` | per-document doc_id, pages, chunk count, page_start coverage, printed-page offsets, toolchain versions |
+| `questions.yaml` | the benchmark's 30 questions (26 answerable, 4 unanswerable); each item's tags record who wrote it (see epic 25, Story 25.5) |
 | `questions-template.yaml` | public fixture template with `page_offsets`, `revisions` and `identifiers` stubbed for every document |
 
 ## Inventory

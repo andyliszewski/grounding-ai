@@ -473,6 +473,35 @@ def test_primary_comparison_is_the_paired_verified_rate_difference(tmp_path):
     assert "Unresolvable means \"could not be checked\", not \"wrong\"." in md
 
 
+def test_a_gate_that_did_not_pass_is_stated_before_the_numbers_it_governs(tmp_path):
+    from grounding.eval.answers.report import AGREEMENT_FILE
+
+    run = _synthetic_run(tmp_path, _primary_rows())
+    pair = {"n": 30, "agreement": 0.8, "cohens_kappa": 0.44}
+    agreement = {
+        "correctness": {"n": 99, "agreement": 0.89, "cohens_kappa": 0.67, "by_method": {}},
+        "abstention": {"n": 13, "agreement": 1.0, "cohens_kappa": None, "by_kind": {}},
+        "support": pair,
+        "publish_gate": {"n": 99, "agreement": 0.89, "result": "pass"},
+        "support_gate": {**pair, "result": "fail"},
+    }
+    (run / AGREEMENT_FILE).write_text(json.dumps(agreement))
+    report = build_report(run)
+    assert any(w.startswith("The citation support gate is fail (n=30, agreement 80%, kappa 0.44)")
+               for w in report["warnings"])
+    assert not any("correctness gate" in w for w in report["warnings"])  # it passed
+    for md in (render_markdown(report, chart_name=None),
+               render_markdown(publishable_view(report), chart_name=None)):
+        head, primary = md.split("## Primary comparison (pre-registered)")
+        assert "The citation support gate is fail" in head
+        assert primary.lstrip().startswith("**Not a result: the citation support gate is fail.**")
+
+    agreement["support_gate"]["result"] = "pass"
+    (run / AGREEMENT_FILE).write_text(json.dumps(agreement))
+    md = render_markdown(build_report(run), chart_name=None)
+    assert "support gate is" not in md.split("## Judge validation")[0]
+
+
 def test_confidently_wrong_counts_zeros_that_did_not_decline(tmp_path):
     rows = [
         _row("a", "ungrounded", score=0.0, declined=False),  # confidently wrong

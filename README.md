@@ -473,7 +473,7 @@ be publicly distributed. That's where the rerank / hybrid flip decisions
 division of concerns: public repo guards retrieval-code regressions; private
 runs guard corpus-quality regressions.
 
-**Grounded-answer benchmark (Epic 25, first run in progress).** A second harness,
+**Grounded-answer benchmark (Epic 25).** A second harness,
 `grounding eval-answers`, scores answers rather than retrieval. The same questions are
 answered by Claude with no sources and with three retrieval configurations (dense, hybrid,
 hybrid plus rerank), and each answer is scored on whether it is correct and whether its
@@ -484,8 +484,14 @@ agreement, plus Cohen's kappa of at least 0.6 for citations). The analysis (the 
 comparison, the gates and the sample size) was written down before the first run. The
 corpus is 25 public-domain US government
 documents (FDA, NASA, DOE, DoD, FAA) that anyone can rebuild from the manifest, with
-SHA-256 checks:
+SHA-256 checks.
 
+**First run (September 2026):** with the library, 96% of 26 answerable questions were answered
+correctly against 46% without it, **+50 points** (95% CI +31 to +69), graded blind by hand. The
+citation judge failed its agreement gate twice (kappa 0.57, then 0.44 on a fresh blind sample),
+so the verified-citation rate is not reported.
+
+- [Write-up of the first run](docs/eval/grounded-answer-benchmark-2026-09.md)
 - [Epic 25 and the pre-registered analysis](docs/epics/epic-25-grounded-answer-benchmark.md#pre-registered-analysis-approved-by-andy-2026-09-14-before-the-first-run)
 - [Public-domain corpus and rebuild kit](benchmarks/public-corpus/)
 

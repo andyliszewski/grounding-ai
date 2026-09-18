@@ -656,6 +656,26 @@ def build_report(run_dir: Path) -> Dict[str, Any]:
             f"{BOOKKEEPING_MAX_SHARE:.0%}); add the missing page offsets or editions and "
             "re-score before reading the primary comparison."
         )
+    # The pre-registered gates decide what may be published. A failed or
+    # insufficient gate goes at the top, so the numbers it governs are never
+    # read as a result from a report that only admits the failure at the end.
+    agreement = data["agreement"] or {}
+    support_gate = agreement.get("support_gate") or {}
+    if support_gate and support_gate.get("result") != "pass":
+        kappa = support_gate.get("cohens_kappa")
+        warnings.append(
+            f"The citation support gate is {support_gate['result']} (n={support_gate.get('n')}, "
+            f"agreement {_pct(support_gate.get('agreement'))}, kappa "
+            f"{'n/a' if kappa is None else f'{kappa:.2f}'}). The verified-citation rates, including "
+            "the primary comparison, are not validated and are not published as a result."
+        )
+    publish_gate = agreement.get("publish_gate") or {}
+    if publish_gate and publish_gate.get("result") != "pass":
+        warnings.append(
+            f"The correctness gate is {publish_gate['result']} (n={publish_gate.get('n')}, "
+            f"agreement {_pct(publish_gate.get('agreement'))}). The judge's correctness scores "
+            "are not published as a result."
+        )
     for rep in data["replicates"]:
         if not rep.get("comparable"):
             warnings.append(
@@ -860,6 +880,13 @@ def _render_primary(report: Mapping[str, Any], lines: List[str]) -> None:
         return
     a, b = pc["conditions"]
     lines += ["## Primary comparison (pre-registered)", ""]
+    gate = (report.get("judge_validation") or {}).get("support_gate") or {}
+    if gate and gate.get("result") != "pass":
+        lines.append(
+            f"**Not a result: the citation support gate is {gate['result']}.** The pre-registered "
+            "analysis publishes this comparison only when the support judge passes its gate "
+            "(see Judge validation), so the figures below are kept for the record."
+        )
     est = pc["estimate"]
     ci = pc.get("ci95")
     diff = "n/a" if est is None else f"{est * 100:+.0f} pts"
