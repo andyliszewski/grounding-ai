@@ -7,6 +7,8 @@
 
 **Local-first document corpus pipeline for grounded AI agents.**
 
+**Measured:** with a Grounding corpus of 25 public-domain engineering documents to search, Claude answered 96% of 26 answerable regulatory and engineering questions correctly, against 46% without it: **+50 points** (95% CI +31 to +69). Every answer was graded by hand, blind to whether it had the corpus, under an analysis written down before the run. The citation check failed its own validation gate, and the [write-up](docs/eval/grounded-answer-benchmark-2026-09.md) reports that too ([details below](#quality)).
+
 Grounding converts PDF, EPUB, DOCX, and Markdown documents into a structured, searchable corpus with per-agent embedding indexes. Drop documents into staging, get chunked Markdown with provenance hashing, FAISS vector indexes, and agent-filtered search -- all running locally, no cloud APIs required.
 
 ## What It Does
